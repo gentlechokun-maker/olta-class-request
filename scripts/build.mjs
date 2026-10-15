@@ -7,3 +7,5 @@ await fs.writeFile('apps-script/Domain.gs','// Generated from public/domain.js b
 console.log('Built dist/ and apps-script/Domain.gs. No private data included.');
 const booking=await fs.readFile('public/booking-domain.js','utf8');
 await fs.writeFile('apps-script/BookingDomain.gs','// Generated from public/booking-domain.js.\n'+booking.replace(/^export /gm,''));
+const review=await fs.readFile('public/review-domain.js','utf8');
+await fs.writeFile('apps-script/ReviewDomain.gs','// Generated from public/review-domain.js.\n'+review.replace(/^export /gm,''));
