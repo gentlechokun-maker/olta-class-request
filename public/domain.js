@@ -11,6 +11,7 @@ export function curriculum(grade,day,semester=2){
   if(grade==='중2'||grade==='중3')return {name:'스레드',minutes:180,lesson:'이론 주 1회 · 3시간'};
   return null;
 }
+export function classCurriculum(c,semester=2){if(c.grade==='중3'&&c.title==='통합과학')return {name:'통합과학',minutes:120,lesson:'이론 주 1회 · 2시간'};return curriculum(c.grade,c.day,semester);}
 export function durationMinutes(start,end){const minutes=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};return minutes(end)-minutes(start);}
 export const STATUS = {registered:'확정 등록',paused:'임시 휴원',makeup:'보강',consultation:'상담 요청',starting:'시작 예정'};
 export const PALETTE = {
@@ -21,7 +22,9 @@ export const PALETTE = {
 };
 export function normalizePhone(value){ return String(value||'').replace(/[^0-9]/g,'').replace(/^82(10)/,'0$1'); }
 export function normalizeName(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ');}
-export function capacity(counts){const used=Number(counts.registered||0)+Number(counts.starting||0);return {used,remaining:Math.max(0,6-used),over:used>6};}
+export function classCapacity(c){return c.grade!=='초6'&&(c.lessonType==='theory'||['중1','중2','중3','고1'].includes(c.grade))?12:6;}
+export function makeupCapacity(type,grade){return type==='theory'&&grade!=='초6'?12:6;}
+export function capacity(counts,limit=6){const used=Number(counts.registered||0)+Number(counts.starting||0);return {used,remaining:Math.max(0,limit-used),over:used>limit};}
 export function parseColoredCell(text,runs,palette=PALETTE){
   const people=[],issues=[];
   if(!text.trim())return {people,issues};

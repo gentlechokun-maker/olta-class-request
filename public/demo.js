@@ -1,4 +1,4 @@
-import {curriculum} from './domain.js';
+import {curriculum,classCapacity} from './domain.js';
 // Fictional times/counts. Curriculum follows the user's second-semester rules.
 export function demoCatalog(){const data={
   "mode": "demo",
@@ -186,4 +186,4 @@ export function demoCatalog(){const data={
     "demo-s3|중2": 1
   }
 };
- data.classes=data.classes.map(c=>({...c,title:curriculum(c.grade,c.day,2).name,lesson:curriculum(c.grade,c.day,2).lesson,remaining:6-c.registered-c.starting,used:c.registered+c.starting,review:false}));return data;}
+ data.classes=data.classes.map(c=>({...c,title:curriculum(c.grade,c.day,2).name,lesson:curriculum(c.grade,c.day,2).lesson,capacity:classCapacity(c),remaining:classCapacity(c)-c.registered-c.starting,used:c.registered+c.starting,review:false}));return data;}
