@@ -4,3 +4,5 @@
 .lesson-detail{font-size:12px;color:#516d58;margin:10px 0 0;background:#f3f6ec;padding:7px 10px;border-radius:5px}
 
 .tabs{flex-wrap:wrap}#makeup-fields{border:1px solid var(--line);border-radius:8px;margin:16px 0;padding:14px}#makeup-fields legend{font-weight:700}#makeup-time{color:var(--green);font-size:13px}
+
+#makeup-fields label{display:flex;flex-direction:column;gap:6px;margin:12px 0;font-size:12px;font-weight:600}#makeup-fields input,#makeup-fields select{width:100%;min-width:0}#makeup-fields{min-width:0}
