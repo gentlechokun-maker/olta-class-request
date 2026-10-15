@@ -91,5 +91,9 @@ export function validateMakeup(input,catalog,now=new Date()){
   const noon=new Date(date+'T12:00:00+09:00');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(noon.getTime())||noon.toISOString().slice(0,10)!==date||['일','월','화','수','목','금','토'][noon.getUTCDay()]!==cls.day)throw new Error('정규 수업 요일에 맞는 보강 날짜를 선택해 주세요.');
   if(instant.getTime()<=now.getTime())throw new Error('이미 지난 보강 시간은 신청할 수 없습니다.');
-  return {...base,kind:'makeup',date,makeupType:input.makeupType,position:input.position,...window};
+  const absenceDate=String(input.absenceDate||''),missedTopic=String(input.missedTopic||'').trim();
+  const absence=new Date(absenceDate+'T12:00:00+09:00'),today=new Date(now.getTime()+9*3600000).toISOString().slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(absenceDate)||!Number.isFinite(absence.getTime())||absence.toISOString().slice(0,10)!==absenceDate||absenceDate>today||absenceDate>date)throw new Error('실제로 결석한 수업 날짜를 입력해 주세요.');
+  if(missedTopic.length<2||missedTopic.length>200)throw new Error('결석한 수업 내용을 2~200자로 입력해 주세요. 모르면 확인 요청으로 적어주세요.');
+  return {...base,kind:'makeup',date,absenceDate,missedTopic,makeupType:input.makeupType,position:input.position,...window};
 }

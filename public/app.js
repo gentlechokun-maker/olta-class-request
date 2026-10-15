@@ -13,7 +13,7 @@ async function load(){state.loading=true;connection('시간표를 확인하고 �
   $('#updated').textContent=state.catalog.updatedAt?'시간표 확인 '+new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(state.catalog.updatedAt)):'예시 화면 · 실제 시간표 미연결';
   renderPrivacy();
 }catch(error){state.catalog={classes:[],slots:[],demand:{},mode:'error'};connection(error.message+' 신청은 일시 중지됩니다.','error');const retry=document.createElement('button');retry.textContent='다시 확인';retry.onclick=load;$('#connection').append(retry);}finally{state.loading=false;render();}}
-function renderPrivacy(){const c=state.catalog;const days=Number(c.retentionDays)||90;const contact=c.privacyContact||'운영자 상담 담당';$('#consent-description').textContent=`수집 항목: 원생 이름·학년, 보호자 연락처, 보강 희망 일정·종류, 상담 참고 내용 / 목적: 수강·보강·반 개설 상담 및 연락 / 보관: 접수 후 ${days}일. 문의·삭제 요청: ${contact}`;$('#privacy-body').innerHTML=`<p><strong>처리 주체: 올타과학</strong></p><p>수집 항목: 원생 이름·학년, 보호자 연락처, 보강 희망 일정·종류, 상담 참고 내용</p><p>이용 목적: 수강·보강 상담, 희망 반 개설 검토 및 상담 연락</p><p>보관 기간: 접수일로부터 ${days}일. 기간이 지나면 신청 기록을 삭제합니다.</p><p>문의·삭제 요청: ${esc(contact)}</p><p>연락처는 비공개 운영 문서에 저장하며, 공개 GitHub 저장소에는 저장하지 않습니다.</p>`;}
+function renderPrivacy(){const c=state.catalog;const days=Number(c.retentionDays)||90;const contact=c.privacyContact||'운영자 상담 담당';$('#consent-description').textContent=`수집 항목: 원생 이름·학년, 보호자 연락처, 결석 날짜·수업 내용, 보강 희망 일정·종류, 상담 참고 내용 / 목적: 수강·보강·반 개설 상담 및 연락 / 보관: 접수 후 ${days}일. 문의·삭제 요청: ${contact}`;$('#privacy-body').innerHTML=`<p><strong>처리 주체: 올타과학</strong></p><p>수집 항목: 원생 이름·학년, 보호자 연락처, 결석 날짜·수업 내용, 보강 희망 일정·종류, 상담 참고 내용</p><p>이용 목적: 수강·보강 상담, 희망 반 개설 검토 및 상담 연락</p><p>보관 기간: 접수일로부터 ${days}일. 기간이 지나면 신청 기록을 삭제합니다.</p><p>문의·삭제 요청: ${esc(contact)}</p><p>연락처는 비공개 운영 문서에 저장하며, 공개 GitHub 저장소에는 저장하지 않습니다.</p>`;}
 function render(){
   const data=state.catalog||{classes:[],slots:[],demand:{}};
   $('#grade-filters').innerHTML=['',...COURSE_GRADES].map(g=>`<button data-grade="${g}" class="${state.grade===g?'active':''}" aria-pressed="${state.grade===g}">${g?gradeLabel(g):'전체'}</button>`).join('');
@@ -35,9 +35,10 @@ function openRequest(kind,id){
   $('#request-title').textContent=kind==='makeup'?'보강 수업 신청':kind==='existing'?'이 반 상담 신청':'새 반 개설 요청';
   $('#request-summary').textContent=`${kind==='new'?'':target.title+' · '}${target.day}요일 ${target.start}–${target.end} · ${target.room}`;
   $('#makeup-fields').hidden=kind!=='makeup';$('#makeup-fields').disabled=kind!=='makeup';
+  form.elements.absenceDate.max=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
   form.elements.date.min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
   $('#demo-form-note').hidden=catalog.mode!=='demo';$('#form-status').textContent='';form.querySelector('[type=submit]').disabled=false;
-  form.querySelector('.form-note').textContent=kind==='makeup'?'보호자가 신청해 주세요. 신청만으로 보강이 확정되지 않으며, 재원 여부와 선생님·교실 일정을 확인한 뒤 연락드립니다.':'보호자가 신청해 주세요. 신청 후 상담을 거쳐 등록하며, 신청 시 자리가 확보되지는 않습니다.';
+  form.querySelector('.form-note').textContent=kind==='makeup'?'보호자가 신청해 주세요. 신청만으로 보강이 확정되지 않으며, 결석 수업 내용과 재원 여부, 선생님·교실 일정을 확인한 뒤 연락드립니다.':'보호자가 신청해 주세요. 신청 후 상담을 거쳐 등록하며, 신청 시 자리가 확보되지는 않습니다.';
   form.querySelector('[type=submit]').textContent=catalog.mode==='demo'?'예시 신청 흐름 확인':kind==='makeup'?'보강 상담 요청하기 ↗':'상담 연락 요청하기 ↗';
   if(kind==='makeup')updateMakeupTime();$('#request-dialog').showModal();
 }
