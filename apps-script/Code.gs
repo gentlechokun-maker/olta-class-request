@@ -7,6 +7,7 @@ const TABLES_ = {
   '동기화':['classId','registered','starting','paused','makeup','consultation','review','issues','updatedAt','configKey'],
   '원생':['classId','name','status','sourceCell','updatedAt'],
   '보강':['id','classId','student','date','status'],
+  '보강신청':['id','createdAt','targetId','student','grade','phone','date','makeupType','position','start','end','note','status','teacher','room','consentVersion','consentAt','confirmedAt'],
   '휴원연락':['classId','student','pauseStart','pauseEnd','followUp','contactedAt','note'],
   '감사':['time','actor','action','recordId']
 };
@@ -73,14 +74,14 @@ function publicCatalog_(){
   const stale=Date.now()-Date.parse(last)>15*60000,classes=classes_(),summaries=read_('동기화'),configuration=configIssues_(classes);
   const visible=classes.filter(c=>COURSE_GRADES.includes(courseGrade(c.grade))).map(c=>{const s=summaries.find(s=>s.classId===c.id),counts=s?capacity(s):{used:0,remaining:0,over:false};return {id:c.id,grade:courseGrade(c.grade),title:c.title,lesson:curriculum(c.grade,c.day,semester_())?.lesson||'',day:c.day,start:c.start,end:c.end,room:c.room,teacher:c.teacher,teacherColor:/^#[a-f0-9]{6}$/i.test(c.teacherColor)?c.teacherColor:'#e6ecd9',used:counts.used,remaining:counts.remaining,review:stale||!s||counts.over||!Number.isFinite(counts.used)||counts.used<0||s.configKey!==classKey_(c)||s.review==='true'||configuration[c.id].length>0};});
   const slots=read_('빈시간').filter(s=>enabled_(s.enabled)&&/^[a-zA-Z0-9_-]{1,50}$/.test(s.id)&&['월','화','수','목','금','토','일'].includes(s.day)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s.start)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s.end)&&s.start<s.end&&s.room&&!classes.some(c=>overlaps(s,c))).map(s=>({id:s.id,day:s.day,start:s.start,end:s.end,room:s.room,grades:[...new Set(s.grades.split(',').map(g=>courseGrade(g.trim())).filter(g=>COURSE_GRADES.includes(g)&&(!curriculum(g,s.day,semester_())||curriculum(g,s.day,semester_()).minutes===durationMinutes(s.start,s.end))))]})).filter(s=>s.grades.length);
-  const requests=read_('신청');return {mode:'live',semester:semester_(),updatedAt:last,classes:visible,slots:stale?[]:slots,demand:aggregateDemand(requests),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT')};
+  const requests=read_('신청');return {makeupEnabled:true,mode:'live',semester:semester_(),updatedAt:last,classes:visible,slots:stale?[]:slots,demand:aggregateDemand(requests),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT')};
 }
 function doGet(e){
   const callback=String(e&&e.parameter&&e.parameter.callback||'');if(callback&&!/^olta_[a-f0-9]{32}$/.test(callback))return ContentService.createTextOutput('{"error":"Invalid callback"}').setMimeType(ContentService.MimeType.JSON);
   let result;try{result=locked_(()=>publicCatalog_());}catch(error){result={error:'시간표를 준비 중이거나 연결을 확인 중입니다. 잠시 후 다시 시도해 주세요.'};}
   const json=JSON.stringify(result).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');return ContentService.createTextOutput(callback?callback+'('+json+');':json).setMimeType(callback?ContentService.MimeType.JAVASCRIPT:ContentService.MimeType.JSON);
 }
-function doPost(e){let result;try{result=locked_(()=>submit_(e&&e.parameter||{}));}catch(error){result={ok:false,message:error.message};}return receipt_(result);}
+function doPost(e){let result;try{result=locked_(()=>{const input=e&&e.parameter||{};return input.kind==='makeup'?submitMakeup_(input):submit_(input);});}catch(error){result={ok:false,message:error.message};}return receipt_(result);}
 function submit_(input){
   const catalog=publicCatalog_(),r=validateRequest(input,catalog),rows=read_('신청');
   const sameId=rows.find(x=>x.id===r.requestId);if(sameId){if(sameId.student!==r.student||sameId.phone!==r.phone||sameId.targetId!==r.targetId||sameId.grade!==r.grade||sameId.kind!==r.kind)throw new Error('신청 식별자가 일치하지 않습니다. 화면을 다시 열어 주세요.');return {ok:true,id:sameId.id,duplicate:true};}
@@ -91,12 +92,58 @@ function submit_(input){
   const timestamp=now_();append_('신청',{id:r.requestId,createdAt:timestamp,kind:r.kind,targetId:r.targetId,student:r.student,grade:r.grade,phone:r.phone,note:r.note,status:'접수',consentVersion:'2026-10-13',consentAt:timestamp});SpreadsheetApp.flush();return {ok:true,id:r.requestId};
 }
 function escape_(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function receipt_(result){const site=props_().getProperty('SITE_URL')||'',link=/^https:\/\/[a-zA-Z0-9.-]+(?:\/[^\s<>"']*)?$/.test(site)?site:'';return HtmlService.createHtmlOutput('<!doctype html><html lang="ko"><head><meta name="referrer" content="no-referrer"></head><body style="font:16px/1.8 system-ui,sans-serif;background:#f7f8f2;color:#174c3e;padding:35px"><main style="max-width:560px;margin:50px auto;background:white;border:1px solid #e0e6dd;border-radius:18px;padding:32px"><p>올타과학 · 상담 신청</p><h1 style="font-size:27px">'+(result.ok?(result.duplicate?'이미 접수된 신청입니다.':'상담 요청이 접수되었습니다.'):'신청을 완료하지 못했습니다.')+'</h1><p>'+(result.ok?'신청은 자리 확보가 아닙니다. 상담 후 시간표 등록을 확인하여 수강을 확정합니다.':'접수되지 않았습니다. '+escape_(result.message))+'</p>'+(result.ok?'<p>접수번호: '+escape_(result.id)+'</p>':'')+(link?'<a target="_top" href="'+escape_(link)+'">수업 안내로 돌아가기 →</a>':'<p>이 창을 닫고 이전 수업 안내 화면으로 돌아가세요.</p>')+'</main></body></html>').setTitle('올타과학 · 접수 결과').addMetaTag('viewport','width=device-width, initial-scale=1');}
+function receipt_(result){const site=props_().getProperty('SITE_URL')||'',link=/^https:\/\/[a-zA-Z0-9.-]+(?:\/[^\s<>"']*)?$/.test(site)?site:'';return HtmlService.createHtmlOutput('<!doctype html><html lang="ko"><head><meta name="referrer" content="no-referrer"></head><body style="font:16px/1.8 system-ui,sans-serif;background:#f7f8f2;color:#174c3e;padding:35px"><main style="max-width:560px;margin:50px auto;background:white;border:1px solid #e0e6dd;border-radius:18px;padding:32px"><p>올타과학 · 상담 신청</p><h1 style="font-size:27px">'+(result.ok?(result.duplicate?'이미 접수된 신청입니다.':'상담 요청이 접수되었습니다.'):'신청을 완료하지 못했습니다.')+'</h1><p>'+(result.ok?(result.makeup?'보강 신청은 확정이 아닙니다. 담당 선생님과 교실 일정을 확인한 뒤 연락드립니다.':'신청은 자리 확보가 아닙니다. 상담 후 시간표 등록을 확인하여 수강을 확정합니다.'):'접수되지 않았습니다. '+escape_(result.message))+'</p>'+(result.ok?'<p>접수번호: '+escape_(result.id)+'</p>':'')+(link?'<a target="_top" href="'+escape_(link)+'">수업 안내로 돌아가기 →</a>':'<p>이 창을 닫고 이전 수업 안내 화면으로 돌아가세요.</p>')+'</main></body></html>').setTitle('올타과학 · 접수 결과').addMetaTag('viewport','width=device-width, initial-scale=1');}
 function getAdminDashboard(){admin_();return locked_(()=>{const catalog=(()=>{try{return publicCatalog_();}catch{return {classes:[],slots:[],demand:{}};}})();return {requests:read_('신청'),classes:classes_(),summaries:read_('동기화'),roster:read_('원생'),makeups:read_('보강'),pauses:read_('휴원연락'),catalog,today:today_(),lastSync:props_().getProperty('LAST_SYNC')||''};});}
 function updateRequest(id,status){admin_();if(!['상담 중','취소'].includes(status))throw new Error('허용되지 않은 상태입니다. 확정은 시간표 확인 기능을 사용하세요.');return locked_(()=>{const rows=read_('신청'),r=rows.find(r=>r.id===id);if(!r)throw new Error('신청을 찾을 수 없습니다.');if(status==='상담 중'&&r.confirmedClassId)throw new Error('시간표에 연결된 신청은 상담 중으로 되돌릴 수 없습니다.');r.status=status;write_('신청',rows);audit_(status,id);return true;});}
 function confirmFromTimetable(id,classId,student){admin_();return locked_(()=>{syncTimetable_();const rows=read_('신청'),r=rows.find(r=>r.id===id),cls=classes_().find(c=>c.id===classId),summary=read_('동기화').find(c=>c.classId===classId);if(!r||r.status==='취소'||!cls||!summary||summary.review==='true')throw new Error('신청과 시간표 확인 상태를 점검해 주세요.');if(courseGrade(cls.grade)!==courseGrade(r.grade))throw new Error('신청 학년과 반 학년이 다릅니다.');const matches=read_('원생').filter(p=>p.classId===classId&&p.name===student&&['registered','starting'].includes(p.status));if(matches.length!==1)throw new Error('시간표에서 검정·보라색 등록 원생을 정확히 확인할 수 없습니다.');if(rows.some(x=>x.id!==id&&x.status!=='취소'&&x.confirmedClassId===classId&&x.confirmedName===student))throw new Error('이 시간표 원생은 이미 다른 신청과 연결되어 있습니다.');r.confirmedClassId=classId;r.confirmedName=student;r.confirmedAt=now_();r.status=STATUS[matches[0].status];write_('신청',rows);audit_('시간표 확인 후 '+r.status,id);return true;});}
 function addMakeup(classId,student,date){admin_();return locked_(()=>{syncTimetable_();const c=classes_().find(c=>c.id===classId),s=read_('동기화').find(s=>s.classId===classId);if(!c||!s||s.review==='true')throw new Error('시간표를 먼저 확인하세요.');if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<today_())throw new Error('오늘 이후의 보강 날짜를 입력하세요.');const parsed=new Date(date+'T12:00:00+09:00');if(Utilities.formatDate(parsed,'Asia/Seoul','yyyy-MM-dd')!==date||['일','월','화','수','목','금','토'][parsed.getUTCDay()]!==c.day)throw new Error('수업 요일과 보강 날짜가 다릅니다.');student=normalizeName(student);if(student.length<2||student.length>30)throw new Error('원생 이름을 확인하세요.');const roster=read_('원생').filter(p=>p.classId===classId);if(roster.some(p=>p.name===student&&['registered','starting'].includes(p.status)))throw new Error('정규 등록 원생입니다. 보강으로 중복 배정할 수 없습니다.');const rows=read_('보강');if(rows.some(m=>m.classId===classId&&m.student===student&&m.date===date&&m.status==='배정'))throw new Error('이미 배정된 보강입니다.');const named=new Set(roster.filter(p=>p.status==='makeup'&&!rows.some(m=>m.classId===classId&&m.student===p.name&&m.status==='배정'&&m.date>=today_())).map(p=>p.name));rows.filter(m=>m.classId===classId&&m.date===date&&m.status==='배정').forEach(m=>named.add(m.student));named.add(student);if(capacity(s).used+named.size>6)throw new Error('해당 날짜의 교실 정원 6명을 초과합니다.');const id=Utilities.getUuid();append_('보강',{id,classId,student,date,status:'배정'});audit_('보강 배정',id);return true;});}
 function cancelMakeup(id){admin_();return locked_(()=>{const rows=read_('보강'),r=rows.find(r=>r.id===id);if(!r)throw new Error('보강 기록을 찾을 수 없습니다.');r.status='취소';write_('보강',rows);audit_('보강 취소',id);return true;});}
+
+function makeupRequests_(){return db_().getSheetByName('보강신청')?read_('보강신청'):[];}
+function ensureMakeupTable_(){
+  if(db_().getSheetByName('보강신청'))return;
+  const sheet=db_().insertSheet('보강신청'),headers=TABLES_['보강신청'];
+  sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e5eddc');sheet.setFrozenRows(1);
+}
+function submitMakeup_(input){
+  const r=validateMakeup(input,publicCatalog_()),rows=makeupRequests_();
+  const same=rows.find(x=>x.id===r.requestId);
+  const equal=x=>['student','phone','targetId','grade','date','makeupType','position','start','end'].every(k=>x[k]===r[k]);
+  if(same){if(!equal(same))throw new Error('신청 식별자가 일치하지 않습니다.');return {ok:true,id:same.id,duplicate:true,makeup:true};}
+  const duplicate=rows.find(x=>x.status!=='취소'&&equal(x));if(duplicate)return {ok:true,id:duplicate.id,duplicate:true,makeup:true};
+  const all=rows.concat(read_('신청'));
+  if(all.filter(x=>x.phone===r.phone&&Date.now()-Date.parse(x.createdAt)<3600000).length>=5)throw new Error('연락처당 한 시간에 최대 5건까지 신청할 수 있습니다.');
+  if(all.filter(x=>Date.now()-Date.parse(x.createdAt)<86400000).length>=300)throw new Error('오늘 온라인 접수량이 많습니다. 학원으로 문의해 주세요.');
+  ensureMakeupTable_();const timestamp=now_();append_('보강신청',{...r,id:r.requestId,createdAt:timestamp,status:'접수',consentVersion:'2026-10-13',consentAt:timestamp});SpreadsheetApp.flush();return {ok:true,id:r.requestId,makeup:true};
+}
+function getMakeupRequests(){admin_();return locked_(()=>makeupRequests_());}
+function reviewMakeupRequest(id,status,teacher,room,verified){
+  admin_();return locked_(()=>{
+    if(!['상담 중','확정','취소'].includes(status))throw new Error('보강 처리 상태를 확인하세요.');
+    const rows=makeupRequests_(),r=rows.find(x=>x.id===id);if(!r||r.status==='취소')throw new Error('처리할 보강 신청이 없습니다.');
+    if(status==='상담 중'&&r.status==='확정')throw new Error('확정된 보강은 취소 후 다시 신청하세요.');
+    if(status==='확정'){
+      if(verified!==true)throw new Error('재원 여부와 담당 선생님·교실 일정을 확인하세요.');
+      syncTimetable_();const cls=publicCatalog_().classes.find(c=>c.id===r.targetId);
+      const checked=validateMakeup({...r,requestId:r.id,consent:'yes',privacyVersion:r.consentVersion},{classes:cls?[cls]:[],slots:[]});
+      if(checked.start!==r.start||checked.end!==r.end)throw new Error('정규 수업 시간이 변경되었습니다. 상담 후 다시 신청하세요.');
+      if(read_('원생').filter(p=>p.classId===r.targetId&&p.name===r.student&&['registered','starting'].includes(p.status)).length!==1)throw new Error('정규반의 등록 원생을 정확히 확인할 수 없습니다.');
+      teacher=String(teacher||'').trim();room=String(room||'').trim();
+      if(!teacher||!room||teacher.length>40||room.length>40)throw new Error('실제 보강 담당 선생님과 교실을 입력하세요.');
+      const resources=classes_(),tokens=value=>String(value||'').split(/[\/→()\s]+/).filter(Boolean);
+      if(!resources.some(c=>tokens(c.teacher).includes(teacher))||!resources.some(c=>tokens(c.room).includes(room)))throw new Error('반설정에 있는 선생님·교실 표기와 동일하게 입력하세요.');
+      const collision=x=>r.start<x.end&&x.start<r.end;
+      if(classes_().some(c=>c.day===cls.day&&collision(c)&&(c.teacher.includes(teacher)||c.room.includes(room))))throw new Error('담당 선생님 또는 교실의 정규 수업 시간과 겹칩니다.');
+      const assigned=rows.filter(x=>x.id!==r.id&&x.date===r.date&&x.status==='확정'&&collision(x));
+      if(assigned.some(x=>x.student===r.student&&x.phone===r.phone))throw new Error('원생의 다른 보강 시간과 겹칩니다.');
+      const shared=assigned.filter(x=>x.teacher===teacher||x.room===room);
+      if(shared.some(x=>x.teacher!==teacher||x.room!==room||x.start!==r.start||x.end!==r.end||x.grade!==r.grade||x.makeupType!==r.makeupType))throw new Error('다른 보강의 담당 선생님 또는 교실 일정과 겹칩니다.');
+      if(shared.length>=6)throw new Error('보강 수업 정원 6명을 초과합니다.');
+      r.teacher=teacher;r.room=room;r.confirmedAt=now_();
+    }
+    r.status=status;write_('보강신청',rows);audit_('보강 신청 '+status,id);return true;
+  });
+}
 function savePause(input){admin_();return locked_(()=>{const rows=read_('휴원연락'),r=rows.find(r=>r.classId===input.classId&&r.student===input.student);if(!r)throw new Error('휴원 기록을 찾을 수 없습니다.');for(const key of ['pauseStart','pauseEnd','followUp']){const value=String(input[key]||'');if(value&&!/^\d{4}-\d{2}-\d{2}$/.test(value))throw new Error('날짜 형식을 확인하세요.');r[key]=value;}if(r.pauseStart&&r.pauseEnd&&r.pauseStart>r.pauseEnd)throw new Error('휴원 종료일을 확인하세요.');r.note=String(input.note||'').slice(0,300);if(input.contacted)r.contactedAt=now_();write_('휴원연락',rows);audit_('휴원 연락 기록 수정',r.classId);return true;});}
 function installTriggers(){admin_();const handlers=['scheduledSync_','cleanup_'];ScriptApp.getProjectTriggers().filter(t=>handlers.includes(t.getHandlerFunction())).forEach(t=>ScriptApp.deleteTrigger(t));ScriptApp.newTrigger('scheduledSync_').timeBased().everyMinutes(5).create();ScriptApp.newTrigger('cleanup_').timeBased().everyDays(1).atHour(3).inTimezone('Asia/Seoul').create();return '설치 완료';}
-function cleanup_(){return locked_(()=>{const days=Number(props_().getProperty('RETENTION_DAYS')||90);if(!Number.isFinite(days)||days<1||days>365)throw new Error('보관 기간은 1~365일이어야 합니다.');const cutoff=Date.now()-days*86400000;write_('신청',read_('신청').filter(r=>Date.parse(r.createdAt)>=cutoff));write_('감사',read_('감사').filter(r=>Date.parse(r.time)>=cutoff));write_('보강',read_('보강').filter(r=>Date.parse(r.date+'T23:59:59+09:00')>=cutoff));});}
+function cleanup_(){return locked_(()=>{const days=Number(props_().getProperty('RETENTION_DAYS')||90);if(!Number.isFinite(days)||days<1||days>365)throw new Error('보관 기간은 1~365일이어야 합니다.');const cutoff=Date.now()-days*86400000;if(db_().getSheetByName('보강신청'))write_('보강신청',makeupRequests_().filter(r=>Date.parse(r.createdAt)>=cutoff));write_('신청',read_('신청').filter(r=>Date.parse(r.createdAt)>=cutoff));write_('감사',read_('감사').filter(r=>Date.parse(r.time)>=cutoff));write_('보강',read_('보강').filter(r=>Date.parse(r.date+'T23:59:59+09:00')>=cutoff));});}

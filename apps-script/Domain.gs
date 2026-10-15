@@ -70,3 +70,27 @@ function aggregateDemand(requests){
   return Object.fromEntries(Object.entries(groups).map(([k,v])=>[k,v.size]));
 }
 function overlaps(a,b){return a.day===b.day&&a.room===b.room&&a.start<b.end&&b.start<a.end;}
+
+// A makeup sits immediately before/after the student's regular class.
+function makeupWindow(cls,type,position){
+  const minutes=type==='experiment'?30:type==='theory'?60:0;
+  const parse=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t||'')?Number(t.slice(0,2))*60+Number(t.slice(3)):NaN;
+  const start=parse(cls.start),end=parse(cls.end);
+  if(!minutes||!['before','after'].includes(position)||!Number.isFinite(start)||!Number.isFinite(end)||end<=start||end>1320)throw new Error('수업 시간과 보강 종류를 확인해 주세요.');
+  const from=position==='before'?start-minutes:end,to=from+minutes;
+  if(from<0||to>1320)throw new Error('보강 수업은 오후 10시까지 끝나야 합니다.');
+  const format=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+  return {start:format(from),end:format(to),minutes};
+}
+function validateMakeup(input,catalog,now=new Date()){
+  const cls=catalog.classes.find(c=>c.id===input.targetId);
+  if(!cls||cls.review)throw new Error('정규 수업 시간표를 먼저 확인해 주세요.');
+  // Reuse contact/consent checks, without applying the regular class seat limit.
+  const base=validateRequest({...input,kind:'existing'},{classes:[{...cls,remaining:1}],slots:[]});
+  const window=makeupWindow(cls,input.makeupType,input.position),date=String(input.date||'');
+  const instant=new Date(date+'T'+window.start+':00+09:00');
+  const noon=new Date(date+'T12:00:00+09:00');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(noon.getTime())||noon.toISOString().slice(0,10)!==date||['일','월','화','수','목','금','토'][noon.getUTCDay()]!==cls.day)throw new Error('정규 수업 요일에 맞는 보강 날짜를 선택해 주세요.');
+  if(instant.getTime()<=now.getTime())throw new Error('이미 지난 보강 시간은 신청할 수 없습니다.');
+  return {...base,kind:'makeup',date,makeupType:input.makeupType,position:input.position,...window};
+}
