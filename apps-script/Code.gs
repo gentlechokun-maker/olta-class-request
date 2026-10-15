@@ -1,6 +1,7 @@
 /** Bind this project to a NEW PRIVATE operations spreadsheet. Never to the public timetable. */
 const TABLES_ = {
   '반설정':['id','grade','title','day','start','end','room','teacher','teacherColor','sourceRange','enabled'],
+  '운영명단':['classId','name','status'],
   '빈시간':['id','day','start','end','room','grades','enabled'],
   '색상':['hex','status'],
   '신청':['id','createdAt','kind','targetId','student','grade','phone','note','status','consentVersion','consentAt','confirmedClassId','confirmedName','confirmedAt'],
@@ -34,11 +35,11 @@ function now_(){return new Date().toISOString();}
 function today_(){return Utilities.formatDate(new Date(),'Asia/Seoul','yyyy-MM-dd');}
 function enabled_(v){return /^(true|1|yes|사용)$/i.test(String(v).trim());}
 function semester_(){return props_().getProperty('SEMESTER')==='1'?1:2;}
-function classes_(){return read_('반설정').filter(c=>enabled_(c.enabled)).map(c=>{const profile=curriculum(c.grade,c.day,semester_());return {...c,title:profile?profile.name:c.title,lesson:profile?profile.lesson:''};});}
+function classes_(){return read_('반설정').filter(c=>enabled_(c.enabled)).map(c=>{const profile=classCurriculum(c,semester_());return {...c,title:profile?profile.name:c.title,capacity:classCapacity(c),lesson:profile?profile.lesson:''};});}
 function audit_(action,id){append_('감사',{time:now_(),actor:Session.getActiveUser().getEmail()||'public',action,recordId:id});}
 function configIssues_(rows){
   const result={};const ids=new Set();
-  rows.forEach(c=>{const issues=[];if(!/^[a-zA-Z0-9_-]{1,50}$/.test(c.id)||ids.has(c.id))issues.push('반 ID 누락 또는 중복');ids.add(c.id);if(!COURSE_GRADES.includes(courseGrade(c.grade)))issues.push('학년 확인');if(!['월','화','수','목','금','토','일'].includes(c.day))issues.push('요일 확인');if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.end)||c.start>=c.end)issues.push('시작·종료 시간 확인');if(!c.room||!c.title||!c.teacher)issues.push('교실·수업명·선생님 확인');if(!/^[A-Z]+[1-9]\d*(?::[A-Z]+[1-9]\d*)?$/.test(c.sourceRange))issues.push('원생 이름 범위 확인');if(rows.some(other=>other!==c&&overlaps(c,other)))issues.push('동일 교실 수업 시간 겹침');const profile=curriculum(c.grade,c.day,semester_());if(profile&&durationMinutes(c.start,c.end)!==profile.minutes)issues.push('수업 시간 확인: '+profile.name+' '+profile.minutes+'분');result[c.id]=issues;});return result;
+  rows.forEach(c=>{const issues=[];if(!/^[a-zA-Z0-9_-]{1,50}$/.test(c.id)||ids.has(c.id))issues.push('반 ID 누락 또는 중복');ids.add(c.id);if(!COURSE_GRADES.includes(courseGrade(c.grade)))issues.push('학년 확인');if(!['월','화','수','목','금','토','일'].includes(c.day))issues.push('요일 확인');if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.end)||c.start>=c.end)issues.push('시작·종료 시간 확인');if(!c.room||!c.title||!c.teacher)issues.push('교실·수업명·선생님 확인');if(c.sourceRange!=='운영명단'&&!/^[A-Z]+[1-9]\d*(?::[A-Z]+[1-9]\d*)?$/.test(c.sourceRange))issues.push('원생 이름 범위 확인');if(rows.some(other=>other!==c&&overlaps(c,other)))issues.push('동일 교실 수업 시간 겹침');const profile=classCurriculum(c,semester_());if(profile&&durationMinutes(c.start,c.end)!==profile.minutes)issues.push('수업 시간 확인: '+profile.name+' '+profile.minutes+'분');result[c.id]=issues;});return result;
 }
 function classKey_(c){return JSON.stringify([c.id,c.grade,c.day,c.start,c.end,c.room,c.sourceRange,semester_()]);}
 function syncTimetable(){admin_();return locked_(()=>syncTimetable_());}
@@ -52,6 +53,14 @@ function syncTimetable_(){
   const timestamp=now_(),roster=[],summaries=[];
   for(const c of classes){const counts={registered:0,starting:0,paused:0,makeup:0,consultation:0},issues=[...configuration[c.id]],names=new Set();
     if(issues.length===0){try{
+      if(c.sourceRange==='운영명단'){
+        for(const person of read_('운영명단').filter(p=>p.classId===c.id)){
+          const name=normalizeName(person.name);
+          if(!name||!STATUS[person.status]||names.has(name)){issues.push('운영명단 이름·상태·중복 확인');continue;}
+          names.add(name);counts[person.status]++;roster.push({classId:c.id,name,status:person.status,sourceCell:'운영명단',updatedAt:timestamp});
+        }
+        if(!names.size)issues.push('운영명단 누락 확인');
+      }else{
       const range=source.getRange(c.sourceRange);if(range.getNumRows()*range.getNumColumns()>500)throw new Error('반당 이름 범위는 500셀 이내로 지정하세요.');
       const texts=range.getDisplayValues(),rich=range.getRichTextValues(),colors=range.getFontColors();
       for(let r=0;r<texts.length;r++)for(let col=0;col<texts[r].length;col++){
@@ -60,7 +69,8 @@ function syncTimetable_(){
         const parsed=parseColoredCell(text,runs,palette);issues.push(...parsed.issues.map(i=>cell+' '+i));
         for(const person of parsed.people){if(names.has(person.name)){issues.push('동명이인 또는 중복 이름 확인: '+person.name);continue;}names.add(person.name);counts[person.status]++;roster.push({classId:c.id,name:person.name,status:person.status,sourceCell:cell,updatedAt:timestamp});}
       }
-      if(capacity(counts).over)issues.push('확정 등록·시작 예정 인원이 정원 6명 초과');
+      }
+      if(capacity(counts,classCapacity(c)).over)issues.push('확정 등록·시작 예정 인원이 정원 '+classCapacity(c)+'명 초과');
     }catch(error){issues.push('원본 범위 읽기 실패: '+error.message);}}
     summaries.push({classId:c.id,...counts,review:issues.length?'true':'false',issues:issues.join('\n'),updatedAt:timestamp,configKey:classKey_(c)});
   }
@@ -72,7 +82,7 @@ function reconcileRequests_(roster,summaries){const requests=read_('신청');let
 function publicCatalog_(){
   const p=props_(),last=p.getProperty('LAST_SYNC');if(!last||!p.getProperty('PRIVACY_CONTACT'))throw new Error('운영자가 시간표와 상담 연락처를 준비 중입니다.');
   const stale=Date.now()-Date.parse(last)>15*60000,classes=classes_(),summaries=read_('동기화'),configuration=configIssues_(classes);
-  const visible=classes.filter(c=>COURSE_GRADES.includes(courseGrade(c.grade))).map(c=>{const s=summaries.find(s=>s.classId===c.id),counts=s?capacity(s):{used:0,remaining:0,over:false};return {id:c.id,grade:courseGrade(c.grade),title:c.title,lesson:curriculum(c.grade,c.day,semester_())?.lesson||'',day:c.day,start:c.start,end:c.end,room:c.room,teacher:c.teacher,teacherColor:/^#[a-f0-9]{6}$/i.test(c.teacherColor)?c.teacherColor:'#e6ecd9',used:counts.used,remaining:counts.remaining,review:stale||!s||counts.over||!Number.isFinite(counts.used)||counts.used<0||s.configKey!==classKey_(c)||s.review==='true'||configuration[c.id].length>0};});
+  const visible=classes.filter(c=>COURSE_GRADES.includes(courseGrade(c.grade))).map(c=>{const s=summaries.find(s=>s.classId===c.id),counts=s?capacity(s,classCapacity(c)):{used:0,remaining:0,over:false};return {id:c.id,grade:courseGrade(c.grade),title:c.title,lesson:classCurriculum(c,semester_())?.lesson||'',day:c.day,start:c.start,end:c.end,room:c.room,teacher:c.teacher,teacherColor:/^#[a-f0-9]{6}$/i.test(c.teacherColor)?c.teacherColor:'#e6ecd9',capacity:classCapacity(c),used:counts.used,remaining:counts.remaining,review:stale||!s||counts.over||!Number.isFinite(counts.used)||counts.used<0||s.configKey!==classKey_(c)||s.review==='true'||configuration[c.id].length>0};});
   const slots=read_('빈시간').filter(s=>enabled_(s.enabled)&&/^[a-zA-Z0-9_-]{1,50}$/.test(s.id)&&['월','화','수','목','금','토','일'].includes(s.day)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s.start)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s.end)&&s.start<s.end&&s.room&&!classes.some(c=>overlaps(s,c))).map(s=>({id:s.id,day:s.day,start:s.start,end:s.end,room:s.room,grades:[...new Set(s.grades.split(',').map(g=>courseGrade(g.trim())).filter(g=>COURSE_GRADES.includes(g)&&(!curriculum(g,s.day,semester_())||curriculum(g,s.day,semester_()).minutes===durationMinutes(s.start,s.end))))]})).filter(s=>s.grades.length);
   const requests=read_('신청');return {makeupEnabled:true,mode:'live',semester:semester_(),updatedAt:last,classes:visible,slots:stale?[]:slots,demand:aggregateDemand(requests),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT')};
 }
@@ -96,7 +106,7 @@ function receipt_(result){const site=props_().getProperty('SITE_URL')||'',link=/
 function getAdminDashboard(){admin_();return locked_(()=>{const catalog=(()=>{try{return publicCatalog_();}catch{return {classes:[],slots:[],demand:{}};}})();return {requests:read_('신청'),classes:classes_(),summaries:read_('동기화'),roster:read_('원생'),makeups:read_('보강'),pauses:read_('휴원연락'),catalog,today:today_(),lastSync:props_().getProperty('LAST_SYNC')||''};});}
 function updateRequest(id,status){admin_();if(!['상담 중','취소'].includes(status))throw new Error('허용되지 않은 상태입니다. 확정은 시간표 확인 기능을 사용하세요.');return locked_(()=>{const rows=read_('신청'),r=rows.find(r=>r.id===id);if(!r)throw new Error('신청을 찾을 수 없습니다.');if(status==='상담 중'&&r.confirmedClassId)throw new Error('시간표에 연결된 신청은 상담 중으로 되돌릴 수 없습니다.');r.status=status;write_('신청',rows);audit_(status,id);return true;});}
 function confirmFromTimetable(id,classId,student){admin_();return locked_(()=>{syncTimetable_();const rows=read_('신청'),r=rows.find(r=>r.id===id),cls=classes_().find(c=>c.id===classId),summary=read_('동기화').find(c=>c.classId===classId);if(!r||r.status==='취소'||!cls||!summary||summary.review==='true')throw new Error('신청과 시간표 확인 상태를 점검해 주세요.');if(courseGrade(cls.grade)!==courseGrade(r.grade))throw new Error('신청 학년과 반 학년이 다릅니다.');const matches=read_('원생').filter(p=>p.classId===classId&&p.name===student&&['registered','starting'].includes(p.status));if(matches.length!==1)throw new Error('시간표에서 검정·보라색 등록 원생을 정확히 확인할 수 없습니다.');if(rows.some(x=>x.id!==id&&x.status!=='취소'&&x.confirmedClassId===classId&&x.confirmedName===student))throw new Error('이 시간표 원생은 이미 다른 신청과 연결되어 있습니다.');r.confirmedClassId=classId;r.confirmedName=student;r.confirmedAt=now_();r.status=STATUS[matches[0].status];write_('신청',rows);audit_('시간표 확인 후 '+r.status,id);return true;});}
-function addMakeup(classId,student,date){admin_();return locked_(()=>{syncTimetable_();const c=classes_().find(c=>c.id===classId),s=read_('동기화').find(s=>s.classId===classId);if(!c||!s||s.review==='true')throw new Error('시간표를 먼저 확인하세요.');if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<today_())throw new Error('오늘 이후의 보강 날짜를 입력하세요.');const parsed=new Date(date+'T12:00:00+09:00');if(Utilities.formatDate(parsed,'Asia/Seoul','yyyy-MM-dd')!==date||['일','월','화','수','목','금','토'][parsed.getUTCDay()]!==c.day)throw new Error('수업 요일과 보강 날짜가 다릅니다.');student=normalizeName(student);if(student.length<2||student.length>30)throw new Error('원생 이름을 확인하세요.');const roster=read_('원생').filter(p=>p.classId===classId);if(roster.some(p=>p.name===student&&['registered','starting'].includes(p.status)))throw new Error('정규 등록 원생입니다. 보강으로 중복 배정할 수 없습니다.');const rows=read_('보강');if(rows.some(m=>m.classId===classId&&m.student===student&&m.date===date&&m.status==='배정'))throw new Error('이미 배정된 보강입니다.');const named=new Set(roster.filter(p=>p.status==='makeup'&&!rows.some(m=>m.classId===classId&&m.student===p.name&&m.status==='배정'&&m.date>=today_())).map(p=>p.name));rows.filter(m=>m.classId===classId&&m.date===date&&m.status==='배정').forEach(m=>named.add(m.student));named.add(student);if(capacity(s).used+named.size>6)throw new Error('해당 날짜의 교실 정원 6명을 초과합니다.');const id=Utilities.getUuid();append_('보강',{id,classId,student,date,status:'배정'});audit_('보강 배정',id);return true;});}
+function addMakeup(classId,student,date){admin_();return locked_(()=>{syncTimetable_();const c=classes_().find(c=>c.id===classId),s=read_('동기화').find(s=>s.classId===classId);if(!c||!s||s.review==='true')throw new Error('시간표를 먼저 확인하세요.');if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<today_())throw new Error('오늘 이후의 보강 날짜를 입력하세요.');const parsed=new Date(date+'T12:00:00+09:00');if(Utilities.formatDate(parsed,'Asia/Seoul','yyyy-MM-dd')!==date||['일','월','화','수','목','금','토'][parsed.getUTCDay()]!==c.day)throw new Error('수업 요일과 보강 날짜가 다릅니다.');student=normalizeName(student);if(student.length<2||student.length>30)throw new Error('원생 이름을 확인하세요.');const roster=read_('원생').filter(p=>p.classId===classId);if(roster.some(p=>p.name===student&&['registered','starting'].includes(p.status)))throw new Error('정규 등록 원생입니다. 보강으로 중복 배정할 수 없습니다.');const rows=read_('보강');if(rows.some(m=>m.classId===classId&&m.student===student&&m.date===date&&m.status==='배정'))throw new Error('이미 배정된 보강입니다.');const named=new Set(roster.filter(p=>p.status==='makeup'&&!rows.some(m=>m.classId===classId&&m.student===p.name&&m.status==='배정'&&m.date>=today_())).map(p=>p.name));rows.filter(m=>m.classId===classId&&m.date===date&&m.status==='배정').forEach(m=>named.add(m.student));named.add(student);if(capacity(s,classCapacity(c)).used+named.size>classCapacity(c))throw new Error('해당 날짜의 수업 정원 '+classCapacity(c)+'명을 초과합니다.');const id=Utilities.getUuid();append_('보강',{id,classId,student,date,status:'배정'});audit_('보강 배정',id);return true;});}
 function cancelMakeup(id){admin_();return locked_(()=>{const rows=read_('보강'),r=rows.find(r=>r.id===id);if(!r)throw new Error('보강 기록을 찾을 수 없습니다.');r.status='취소';write_('보강',rows);audit_('보강 취소',id);return true;});}
 
 function makeupRequests_(){return db_().getSheetByName('보강신청')?read_('보강신청'):[];}
@@ -138,7 +148,7 @@ function reviewMakeupRequest(id,status,teacher,room,verified){
       if(assigned.some(x=>x.student===r.student&&x.phone===r.phone))throw new Error('원생의 다른 보강 시간과 겹칩니다.');
       const shared=assigned.filter(x=>x.teacher===teacher||x.room===room);
       if(shared.some(x=>x.teacher!==teacher||x.room!==room||x.start!==r.start||x.end!==r.end||x.grade!==r.grade||x.makeupType!==r.makeupType||x.absenceDate!==r.absenceDate||x.missedTopic!==r.missedTopic))throw new Error('다른 보강의 담당 선생님 또는 교실 일정과 겹칩니다.');
-      if(shared.length>=6)throw new Error('보강 수업 정원 6명을 초과합니다.');
+      if(shared.length>=makeupCapacity(r.makeupType,r.grade))throw new Error('보강 수업 정원 '+makeupCapacity(r.makeupType,r.grade)+'명을 초과합니다.');
       r.teacher=teacher;r.room=room;r.confirmedAt=now_();
     }
     r.status=status;ensureMakeupTable_();write_('보강신청',rows);audit_('보강 신청 '+status,id);return true;
