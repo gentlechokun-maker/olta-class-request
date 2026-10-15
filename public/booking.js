@@ -20,7 +20,7 @@ $('#cancel-guide').textContent='접수 결과에 표시된 접수번호와 확�
 cf.elements.bookingKind.value=scope;
 const val=n=>f.elements[n].value;
 const classes=()=>catalog.classes.filter(c=>c.grade===val('grade')&&!c.review&&(kind!=='visit'||c.remaining>0));
-const label=c=>`${c.grade} ${c.title} · ${c.day} ${c.start}–${c.end} · ${c.room}`;
+const label=c=>`${c.grade} ${String(c.title||'').replaceAll('시작반','신규반')} · ${c.day} ${c.start}–${c.end} · ${c.room}`;
 function select(el,rows,placeholder='선택해 주세요'){const old=el.value;el.innerHTML='<option value="">'+placeholder+'</option>'+rows.map(r=>`<option value="${esc(r.value)}" ${r.disabled?'disabled':''}>${esc(r.text)}</option>`).join('');if(rows.some(r=>r.value===old&&!r.disabled))el.value=old;}
 function jsonp(){return new Promise((resolve,reject)=>{const name='olta_'+crypto.randomUUID().replaceAll('-',''),s=document.createElement('script');let timer;const cleanup=()=>{clearTimeout(timer);s.remove();delete window[name];};window[name]=r=>{cleanup();r.error?reject(Error(r.error)):resolve(r);};timer=setTimeout(()=>{cleanup();reject(Error('예약 서버 응답이 늦습니다. 다시 연결해 주세요.'));},45000);s.onerror=()=>{cleanup();reject(Error('예약 서버에 연결할 수 없습니다.'));};s.src=config.apiUrl+'?action=bookings&callback='+name;document.head.append(s);});}
 function randomToken(){return [...crypto.getRandomValues(new Uint8Array(24))].map(n=>n.toString(16).padStart(2,'0')).join('');}
