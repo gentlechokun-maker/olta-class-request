@@ -3,8 +3,21 @@ import {demoCatalog} from './demo.js';
 const $=s=>document.querySelector(s),f=$('#booking-form'),cf=$('#cancel-form'),config=window.OLTA_CONFIG||{};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const params=new URLSearchParams(location.search);let kind=params.get('kind')||'seminar',catalog=null;
-let receipt=null;try{receipt=JSON.parse(decodeURIComponent(location.hash.slice(1)));if(receipt?.id&&receipt?.token){kind='cancel';history.replaceState(null,'',location.pathname+'?kind=cancel');}}catch{}
+let receipt=null;try{receipt=JSON.parse(decodeURIComponent(location.hash.slice(1)));if(receipt?.id&&receipt?.token){kind='cancel';const receiptScope=['seminar','visit','absence'].includes(receipt.kind)?receipt.kind:'seminar';history.replaceState(null,'',location.pathname+'?kind=cancel&bookingKind='+receiptScope);}}catch{}
 if(!['seminar','visit','absence','cancel'].includes(kind))kind='seminar';
+const requestedScope=kind==='cancel'?(receipt?.kind||params.get('bookingKind')||'seminar'):kind;
+const scope=['seminar','visit','absence'].includes(requestedScope)?requestedScope:'seminar';
+const scopeTitle={seminar:'설명회 안내',visit:'방문 상담 예약',absence:'결석·보강 신청'}[scope];
+const cancelTitle={seminar:'설명회 신청 취소',visit:'방문 상담 예약 취소',absence:'결석·보강 신청 취소'}[scope];
+$('#seminar-navigation').hidden=scope!=='seminar';
+$('#page-heading').textContent=kind==='cancel'?cancelTitle:scopeTitle;
+document.title=(kind==='cancel'?cancelTitle:scopeTitle)+' | 올타과학';
+$('#cancel-link').href='./booking.html?kind=cancel&bookingKind='+scope;
+$('#cancel-link').textContent=cancelTitle;
+$('#cancel-link').hidden=kind==='cancel';
+$('#cancel-heading').textContent=cancelTitle;
+$('#cancel-guide').textContent='접수 결과에 표시된 접수번호와 확인 코드를 입력해 주세요.'+(scope==='seminar'?' 대면 설명회는 전날 14시까지 취소할 수 있습니다. 온라인 설명회에는 취소 기한이 없습니다.':'');
+cf.elements.bookingKind.value=scope;
 const val=n=>f.elements[n].value;
 const classes=()=>catalog.classes.filter(c=>c.grade===val('grade')&&!c.review&&(kind!=='visit'||c.remaining>0));
 const label=c=>`${c.grade} ${c.title} · ${c.day} ${c.start}–${c.end} · ${c.room}`;
@@ -26,7 +39,7 @@ function refresh(){if(!catalog||kind==='cancel')return;
 }
 async function load(){catalog=null;$('#application').hidden=true;$('#cancellation').hidden=true;$('#retry').hidden=true;$('#connection').textContent='일정을 불러오고 있습니다.';try{if(!config.apiUrl){catalog={...demoCatalog(),mode:'demo',bookingEnabled:true,weeks:await(await fetch('./calendar-2026.json')).json(),seminars:[{id:'sample',title:'예시 설명회',date:'2026-11-15',start:'14:00',location:'예시 강의실',enabled:'true',remaining:20}],visits:[],makeupSeats:{}};}else{if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(config.apiUrl))throw Error('운영 서버 주소를 확인해 주세요.');catalog=await jsonp();if(!catalog.bookingEnabled)throw Error('예약 기능 서버 업데이트가 필요합니다. 학원에 문의해 주세요.');}
  $('#connection').textContent=catalog.mode==='demo'?'미리보기 · 입력 내용은 저장되지 않습니다.':'예약 서버 연결됨 · 모든 시간은 한국 시간입니다.';
- if(kind==='cancel'){$('#cancellation').hidden=false;if(receipt){cf.elements.id.value=receipt.id;cf.elements.token.value=receipt.token;cf.elements.bookingKind.value=receipt.kind;}return;}
+ if(kind==='cancel'){$('#cancellation').hidden=false;if(receipt){cf.elements.id.value=receipt.id;cf.elements.token.value=receipt.token;}return;}
  $('#application').hidden=false;f.elements.kind.value=kind;f.elements.requestId.value=crypto.randomUUID();f.elements.token.value=randomToken();f.elements.privacyVersion.value=BOOKING_VERSION;
  const grades=['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1'];select(f.elements.grade,grades.map(g=>({value:g,text:g})));showField('#seminar-fields',kind==='seminar');showField('#class-fields',kind!=='seminar');showField('#visit-fields',kind==='visit');showField('#absence-fields',kind==='absence');
  $('#title').textContent={seminar:'설명회 안내',visit:'30분 방문 상담 예약',absence:'결석·보강 신청'}[kind];$('#submit').textContent=kind==='seminar'?'설명회 참석 신청하기 ↗':'신청하기 ↗';$('#guide').textContent={seminar:'대면 설명회는 선착순 20명입니다. 온라인 설명회는 인원 제한 없이 신청하실 수 있습니다.',visit:'희망하는 반을 선택하고 방문 일정을 예약해 주세요. 수강 등록은 상담 후 시간표에 반영된 것을 확인하여 확정합니다.',absence:'결석한 수업 내용을 보강합니다. 같은 수업 주차는 동일 학년 빈자리 수업, 다른 주차는 재원 중인 수업 전후로 신청합니다. 보강은 관리자 확인 후 확정됩니다.'}[kind];
