@@ -41,7 +41,7 @@ function configIssues_(rows){
   const result={};const ids=new Set();
   rows.forEach(c=>{const issues=[];if(!/^[a-zA-Z0-9_-]{1,50}$/.test(c.id)||ids.has(c.id))issues.push('반 ID 누락 또는 중복');ids.add(c.id);if(!COURSE_GRADES.includes(courseGrade(c.grade)))issues.push('학년 확인');if(!['월','화','수','목','금','토','일'].includes(c.day))issues.push('요일 확인');if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.end)||c.start>=c.end)issues.push('시작·종료 시간 확인');if(!c.room||!c.title||!c.teacher)issues.push('교실·수업명·선생님 확인');if(c.sourceRange!=='운영명단'&&!/^[A-Z]+[1-9]\d*(?::[A-Z]+[1-9]\d*)?$/.test(c.sourceRange))issues.push('원생 이름 범위 확인');if(rows.some(other=>other!==c&&overlaps(c,other)))issues.push('동일 교실 수업 시간 겹침');const profile=classCurriculum(c,semester_());if(profile&&durationMinutes(c.start,c.end)!==profile.minutes)issues.push('수업 시간 확인: '+profile.name+' '+profile.minutes+'분');result[c.id]=issues;});return result;
 }
-function classKey_(c){return JSON.stringify([c.id,c.grade,c.day,c.start,c.end,c.room,c.sourceRange,semester_()]);}
+function classKey_(c){return JSON.stringify([c.id,c.grade,c.title,c.day,c.start,c.end,c.room,c.sourceRange,semester_()]);}
 function syncTimetable(){admin_();return locked_(()=>syncTimetable_());}
 function scheduledSync_(){return locked_(()=>syncTimetable_());}
 function syncTimetable_(){
