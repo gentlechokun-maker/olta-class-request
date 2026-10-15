@@ -7,7 +7,7 @@ const TABLES_ = {
   '동기화':['classId','registered','starting','paused','makeup','consultation','review','issues','updatedAt','configKey'],
   '원생':['classId','name','status','sourceCell','updatedAt'],
   '보강':['id','classId','student','date','status'],
-  '보강신청':['id','createdAt','targetId','student','grade','phone','date','makeupType','position','start','end','note','status','teacher','room','consentVersion','consentAt','confirmedAt'],
+  '보강신청':['id','createdAt','targetId','student','grade','phone','date','makeupType','position','start','end','note','status','teacher','room','consentVersion','consentAt','confirmedAt','absenceDate','missedTopic'],
   '휴원연락':['classId','student','pauseStart','pauseEnd','followUp','contactedAt','note'],
   '감사':['time','actor','action','recordId']
 };
@@ -101,14 +101,14 @@ function cancelMakeup(id){admin_();return locked_(()=>{const rows=read_('보강'
 
 function makeupRequests_(){return db_().getSheetByName('보강신청')?read_('보강신청'):[];}
 function ensureMakeupTable_(){
-  if(db_().getSheetByName('보강신청'))return;
+  const existing=db_().getSheetByName('보강신청');if(existing){const headers=TABLES_['보강신청'];existing.getRange(1,1,1,headers.length).setValues([headers]);return;}
   const sheet=db_().insertSheet('보강신청'),headers=TABLES_['보강신청'];
   sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e5eddc');sheet.setFrozenRows(1);
 }
 function submitMakeup_(input){
   const r=validateMakeup(input,publicCatalog_()),rows=makeupRequests_();
   const same=rows.find(x=>x.id===r.requestId);
-  const equal=x=>['student','phone','targetId','grade','date','makeupType','position','start','end'].every(k=>x[k]===r[k]);
+  const equal=x=>['student','phone','targetId','grade','date','makeupType','position','start','end','absenceDate','missedTopic'].every(k=>x[k]===r[k]);
   if(same){if(!equal(same))throw new Error('신청 식별자가 일치하지 않습니다.');return {ok:true,id:same.id,duplicate:true,makeup:true};}
   const duplicate=rows.find(x=>x.status!=='취소'&&equal(x));if(duplicate)return {ok:true,id:duplicate.id,duplicate:true,makeup:true};
   const all=rows.concat(read_('신청'));
@@ -137,11 +137,11 @@ function reviewMakeupRequest(id,status,teacher,room,verified){
       const assigned=rows.filter(x=>x.id!==r.id&&x.date===r.date&&x.status==='확정'&&collision(x));
       if(assigned.some(x=>x.student===r.student&&x.phone===r.phone))throw new Error('원생의 다른 보강 시간과 겹칩니다.');
       const shared=assigned.filter(x=>x.teacher===teacher||x.room===room);
-      if(shared.some(x=>x.teacher!==teacher||x.room!==room||x.start!==r.start||x.end!==r.end||x.grade!==r.grade||x.makeupType!==r.makeupType))throw new Error('다른 보강의 담당 선생님 또는 교실 일정과 겹칩니다.');
+      if(shared.some(x=>x.teacher!==teacher||x.room!==room||x.start!==r.start||x.end!==r.end||x.grade!==r.grade||x.makeupType!==r.makeupType||x.absenceDate!==r.absenceDate||x.missedTopic!==r.missedTopic))throw new Error('다른 보강의 담당 선생님 또는 교실 일정과 겹칩니다.');
       if(shared.length>=6)throw new Error('보강 수업 정원 6명을 초과합니다.');
       r.teacher=teacher;r.room=room;r.confirmedAt=now_();
     }
-    r.status=status;write_('보강신청',rows);audit_('보강 신청 '+status,id);return true;
+    r.status=status;ensureMakeupTable_();write_('보강신청',rows);audit_('보강 신청 '+status,id);return true;
   });
 }
 function savePause(input){admin_();return locked_(()=>{const rows=read_('휴원연락'),r=rows.find(r=>r.classId===input.classId&&r.student===input.student);if(!r)throw new Error('휴원 기록을 찾을 수 없습니다.');for(const key of ['pauseStart','pauseEnd','followUp']){const value=String(input[key]||'');if(value&&!/^\d{4}-\d{2}-\d{2}$/.test(value))throw new Error('날짜 형식을 확인하세요.');r[key]=value;}if(r.pauseStart&&r.pauseEnd&&r.pauseStart>r.pauseEnd)throw new Error('휴원 종료일을 확인하세요.');r.note=String(input.note||'').slice(0,300);if(input.contacted)r.contactedAt=now_();write_('휴원연락',rows);audit_('휴원 연락 기록 수정',r.classId);return true;});}
