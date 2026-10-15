@@ -30,7 +30,7 @@ test('makeup submit stores derived time, idempotent retry, separate dates and no
   r.submitMakeup_({...input,date:'2099-10-22',requestId:'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'});assert.equal(rows.length,2);
   assert.equal(cls.remaining,0);
 });
-test('makeup approval requires identity confirmation, registered roster, no conflicts and capacity <=6',()=>{
+test('makeup approval requires identity confirmation, registered roster, no conflicts and linked grade-six theory capacity <=6',()=>{
   const r=runtime();let rows=[{...input,id:input.requestId,consentVersion:'2026-10-13',start:'21:00',end:'22:00',status:'접수'}];r.makeupRequests_=()=>rows;
   r.read_=()=>[{classId:'c1',name:input.student,status:'registered'}];r.write_=(n,v)=>{rows=v;};
   assert.throws(()=>r.reviewMakeupRequest(input.requestId,'확정','홍T','2교실',false),/확인/);
