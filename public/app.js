@@ -1,4 +1,4 @@
-import {GRADES,COURSE_GRADES,courseGrade,gradeLabel,studentGrades,curriculum,normalizePhone,makeupWindow,validateMakeup} from './domain.js';
+import {GRADES,COURSE_GRADES,courseGrade,gradeLabel,studentGrades,curriculum,normalizePhone,makeupWindow,validateMakeup} from './domain.js?v=20261015-makeup3';
 import {demoCatalog} from './demo.js';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
