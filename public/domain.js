@@ -84,7 +84,32 @@ export function openingSlotAvailable(slot,classes){
   const busy=dayClasses.filter(c=>slot.start<c.end&&c.start<slot.end);
   if(busy.some(c=>!c.teacher||!c.room||/확인|미정/.test(c.teacher+' '+c.room)))return false;
   if(busy.some(c=>tokens(c.room).some(room=>tokens(slot.room).includes(room))))return false;
-  return ['신T','홍T'].some(t=>!(t==='신T'&&slot.day==='수')&&!(t==='홍T'&&slot.day==='금')&&!busy.some(c=>tokens(c.teacher).includes(t)));
+  return (slot.teachers||['신T','홍T']).some(t=>['신T','홍T'].includes(t)&&!(t==='신T'&&slot.day==='수')&&!(t==='홍T'&&slot.day==='금')&&!busy.some(c=>tokens(c.teacher).includes(t)));
+}
+
+// Explicitly supplied opening windows, 2026-10-16. Never infer working hours
+// from blank cells. Single start times are one-hour windows; 'after' ends at 22.
+export const OPENING_WINDOWS = [
+ ['월',15,16,['홍T']],['월',20,22,['신T','홍T']],
+ ['화',16,17,['홍T','신T']],['화',17,18,['신T']],['화',20,22,['홍T']],
+ ['수',19,22,['홍T']],['목',14,15,['신T']],['목',16,17,['신T']],['목',19,22,['홍T']],
+ ['토',12,13,['신T']],['토',17,22,['신T','홍T']],
+ ['일',10,11,['홍T']],['일',11,12,['홍T']],['일',14,22,['홍T']]
+];
+export function generateOpeningSlots(classes,semester=2){
+ const rooms=[...new Set(classes.flatMap(c=>String(c.room||'').match(/\d+교실/g)||[]))].sort();
+ const fmt=h=>String(h).padStart(2,'0')+':00',days=['월','화','수','목','금','토','일'],out=[];
+ for(const day of days)for(let hour=0;hour<22;hour++)for(const length of [1,2,3]){
+   if(hour+length>22)continue;
+   const teachers=['신T','홍T'].filter(t=>Array.from({length},(_,i)=>hour+i).every(h=>OPENING_WINDOWS.some(w=>w[0]===day&&w[1]<=h&&w[2]>=h+1&&w[3].includes(t))));
+   if(!teachers.length)continue;
+   const grades=COURSE_GRADES.filter(g=>(curriculum(g,day,semester)?.minutes||(g==='고1'?120:0))===length*60);
+   if(!grades.length)continue;
+   const slot={id:'opening-'+days.indexOf(day)+'-'+hour+'-'+length,day,start:fmt(hour),end:fmt(hour+length),teachers};
+   const room=rooms.find(room=>openingSlotAvailable({...slot,room},classes));
+   if(room)out.push({id:slot.id,day,start:slot.start,end:slot.end,room,grades});
+ }
+ return out;
 }
 
 // A makeup sits immediately before/after the student's regular class.
