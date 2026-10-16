@@ -73,6 +73,20 @@ export function aggregateDemand(requests){
 }
 export function overlaps(a,b){return a.day===b.day&&a.room===b.room&&a.start<b.end&&b.start<a.end;}
 
+// Only administrator-approved windows are candidates. An empty timetable cell
+// does not establish working hours. Unknown resources must never imply free time.
+export function openingSlotAvailable(slot,classes){
+  const validTime=s=>/^([01]\d|2[0-3]):[0-5]\d$/.test(s||'');
+  const tokens=s=>String(s||'').replace(/\([^)]*\)/g,'').split(/[\s,·/→]+/).filter(Boolean);
+  if(!['월','화','수','목','금','토','일'].includes(slot.day)||!validTime(slot.start)||!validTime(slot.end)||slot.start>=slot.end||slot.end>'22:00'||!slot.room)return false;
+  const dayClasses=classes.filter(c=>c.day===slot.day);
+  if(dayClasses.some(c=>!validTime(c.start)||!validTime(c.end)||c.start>=c.end))return false;
+  const busy=dayClasses.filter(c=>slot.start<c.end&&c.start<slot.end);
+  if(busy.some(c=>!c.teacher||!c.room||/확인|미정/.test(c.teacher+' '+c.room)))return false;
+  if(busy.some(c=>tokens(c.room).some(room=>tokens(slot.room).includes(room))))return false;
+  return ['신T','홍T'].some(t=>!(t==='신T'&&slot.day==='수')&&!(t==='홍T'&&slot.day==='금')&&!busy.some(c=>tokens(c.teacher).includes(t)));
+}
+
 // A makeup sits immediately before/after the student's regular class.
 export function makeupWindow(cls,type,position){
   const minutes=type==='experiment'?30:type==='theory'?60:0;

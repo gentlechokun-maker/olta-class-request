@@ -2,13 +2,15 @@ import {BOOKING_VERSION,bookingToday,bookingDay,bookingCategory,bookingInstant,s
 import {demoCatalog} from './demo.js';
 const $=s=>document.querySelector(s),f=$('#booking-form'),cf=$('#cancel-form'),config=window.OLTA_CONFIG||{};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const params=new URLSearchParams(location.search);let kind=params.get('kind')||'seminar',catalog=null;
+const params=new URLSearchParams(location.search);
+if(params.get('kind')==='visit'){location.replace(params.get('targetId')?'./?classId='+encodeURIComponent(params.get('targetId'))+'#classes':'./#new');}
+let kind=params.get('kind')||'seminar',catalog=null;
 let receipt=null;try{receipt=JSON.parse(decodeURIComponent(location.hash.slice(1)));if(receipt?.id&&receipt?.token){kind='cancel';const receiptScope=['seminar','visit','absence'].includes(receipt.kind)?receipt.kind:'seminar';history.replaceState(null,'',location.pathname+'?kind=cancel&bookingKind='+receiptScope);}}catch{}
 if(!['seminar','visit','absence','cancel'].includes(kind))kind='seminar';
 const requestedScope=kind==='cancel'?(receipt?.kind||params.get('bookingKind')||'seminar'):kind;
 const scope=['seminar','visit','absence'].includes(requestedScope)?requestedScope:'seminar';
-const scopeTitle={seminar:'설명회 안내',visit:'방문 상담 예약',absence:'결석·보강 신청'}[scope];
-const cancelTitle={seminar:'설명회 신청 취소',visit:'방문 상담 예약 취소',absence:'결석·보강 신청 취소'}[scope];
+const scopeTitle={seminar:'설명회 안내',visit:'방문 상담 예약',absence:'결석·보강 예약'}[scope];
+const cancelTitle={seminar:'설명회 신청 취소',visit:'방문 상담 예약 취소',absence:'결석·보강 예약 취소'}[scope];
 $('#seminar-navigation').hidden=scope!=='seminar';
 $('#page-heading').textContent=kind==='cancel'?cancelTitle:scopeTitle;
 document.title=(kind==='cancel'?cancelTitle:scopeTitle)+' | 올타과학';
@@ -42,7 +44,7 @@ async function load(){catalog=null;$('#application').hidden=true;$('#cancellatio
  if(kind==='cancel'){$('#cancellation').hidden=false;if(receipt){cf.elements.id.value=receipt.id;cf.elements.token.value=receipt.token;}return;}
  $('#application').hidden=false;f.elements.kind.value=kind;f.elements.requestId.value=crypto.randomUUID();f.elements.token.value=randomToken();f.elements.privacyVersion.value=BOOKING_VERSION;
  const grades=['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1'];select(f.elements.grade,grades.map(g=>({value:g,text:g})));showField('#seminar-fields',kind==='seminar');showField('#class-fields',kind!=='seminar');showField('#visit-fields',kind==='visit');showField('#absence-fields',kind==='absence');
- $('#title').textContent={seminar:'설명회 안내',visit:'30분 방문 상담 예약',absence:'결석·보강 신청'}[kind];$('#submit').textContent=kind==='seminar'?'설명회 참석 신청하기 ↗':'신청하기 ↗';$('#guide').textContent={seminar:'대면 설명회는 선착순 20명입니다. 온라인 설명회는 인원 제한 없이 신청하실 수 있습니다.',visit:'희망하는 반을 선택하고 방문 일정을 예약해 주세요. 수강 등록은 상담 후 시간표에 반영된 것을 확인하여 확정합니다.',absence:'결석한 수업 내용을 보강합니다. 같은 수업 주차는 동일 학년 빈자리 수업, 다른 주차는 재원 중인 수업 전후로 신청합니다. 보강은 관리자 확인 후 확정됩니다.'}[kind];
+ $('#title').textContent={seminar:'설명회 안내',visit:'30분 방문 상담 예약',absence:'결석·보강 예약'}[kind];$('#submit').textContent=kind==='seminar'?'설명회 참석 신청하기 ↗':'신청하기 ↗';$('#guide').textContent={seminar:'대면 설명회는 선착순 20명입니다. 온라인 설명회는 인원 제한 없이 신청하실 수 있습니다.',visit:'희망하는 반을 선택하고 방문 일정을 예약해 주세요. 수강 등록은 상담 후 시간표에 반영된 것을 확인하여 확정합니다.',absence:'결석한 수업 내용을 보강합니다. 같은 수업 주차는 동일 학년 빈자리 수업, 다른 주차는 재원 중인 수업 전후로 신청합니다. 보강은 관리자 확인 후 확정됩니다.'}[kind];
  select(f.elements.eventId,catalog.seminars.map(e=>({value:e.id,text:e.title+' · '+e.date+' '+e.start})),catalog.seminars.length?'설명회 선택':'현재 신청 가능한 설명회가 없습니다');
  const target=catalog.classes.find(c=>c.id===params.get('targetId'));if(target)f.elements.grade.value=target.grade;refreshClasses();if(target)f.elements.targetId.value=target.id;
  f.elements.absenceDate.max=bookingToday();f.elements.visitDate.min=bookingToday();f.elements.makeupDate.min=bookingToday();
