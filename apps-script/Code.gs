@@ -12,7 +12,7 @@ const TABLES_ = {
   '휴원연락':['classId','student','pauseStart','pauseEnd','followUp','contactedAt','note'],
   '감사':['time','actor','action','recordId']
 };
-function onOpen(){SpreadsheetApp.getUi().createMenu('올타 상담 앱').addItem('처음 설정','setup').addItem('관리 화면','openAdmin').addItem('설명회·방문상담·결석보강','openBookingAdmin').addItem('예약 기능·2026 달력 설정','setupBookings').addItem('시간표 동기화','syncTimetable').addItem('5분 동기화·매일 정리 설치','installTriggers').addToUi();}
+function onOpen(){SpreadsheetApp.getUi().createMenu('올타 상담 앱').addItem('처음 설정','setup').addItem('관리 화면','openAdmin').addItem('설명회·방문상담·결석보강','openBookingAdmin').addItem('예약 기능·2026 달력 설정','setupBookings').addItem('시간표 동기화','syncTimetable').addItem('6시간 동기화·매일 정리 설치','installTriggers').addToUi();}
 function props_(){return PropertiesService.getScriptProperties();}
 let DB_HANDLE_=null;
 function db_(){if(DB_HANDLE_)return DB_HANDLE_;const id=props_().getProperty('DB_ID');if(!id)throw new Error('운영 저장소 설정이 필요합니다.');DB_HANDLE_=SpreadsheetApp.openById(id);return DB_HANDLE_;}
@@ -29,8 +29,8 @@ function setup(){
 function openAdmin(){admin_();SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutputFromFile('Admin').setWidth(1180).setHeight(760),'올타과학 · 상담과 운영');}
 function read_(name){const sheet=db_().getSheetByName(name);if(!sheet)throw new Error('운영 시트를 초기화하세요.');const values=sheet.getDataRange().getDisplayValues(),headers=values.shift();return values.filter(row=>row.some(Boolean)).map(row=>Object.fromEntries(headers.map((key,i)=>[key,row[i]||''])));}
 function safeCell_(value){const s=String(value??'');return /^[=+@\-]/.test(s)?"'"+s:s;}
-function write_(name,rows){const sheet=db_().getSheetByName(name),headers=TABLES_[name];if(sheet.getLastRow()>1)sheet.getRange(2,1,sheet.getLastRow()-1,headers.length).clearContent();if(rows.length){if(sheet.getMaxRows()<rows.length+1)sheet.insertRowsAfter(sheet.getMaxRows(),rows.length+1-sheet.getMaxRows());sheet.getRange(2,1,rows.length,headers.length).setNumberFormat('@').setValues(rows.map(r=>headers.map(k=>safeCell_(r[k]))));}}
-function append_(name,row){const sheet=db_().getSheetByName(name),headers=TABLES_[name];const n=sheet.getLastRow()+1;if(n>sheet.getMaxRows())sheet.insertRowAfter(sheet.getMaxRows());sheet.getRange(n,1,1,headers.length).setNumberFormat('@').setValues([headers.map(k=>safeCell_(row[k]))]);}
+function write_(name,rows){invalidateCatalogCache_();const sheet=db_().getSheetByName(name),headers=TABLES_[name];if(sheet.getLastRow()>1)sheet.getRange(2,1,sheet.getLastRow()-1,headers.length).clearContent();if(rows.length){if(sheet.getMaxRows()<rows.length+1)sheet.insertRowsAfter(sheet.getMaxRows(),rows.length+1-sheet.getMaxRows());sheet.getRange(2,1,rows.length,headers.length).setNumberFormat('@').setValues(rows.map(r=>headers.map(k=>safeCell_(r[k]))));}}
+function append_(name,row){invalidateCatalogCache_();const sheet=db_().getSheetByName(name),headers=TABLES_[name];const n=sheet.getLastRow()+1;if(n>sheet.getMaxRows())sheet.insertRowAfter(sheet.getMaxRows());sheet.getRange(n,1,1,headers.length).setNumberFormat('@').setValues([headers.map(k=>safeCell_(row[k]))]);}
 function locked_(fn){const lock=LockService.getScriptLock();if(!lock.tryLock(20000))throw new Error('다른 신청을 처리하고 있습니다. 잠시 후 다시 시도해 주세요.');try{return fn();}finally{lock.releaseLock();}}
 function now_(){return new Date().toISOString();}
 function today_(){return Utilities.formatDate(new Date(),'Asia/Seoul','yyyy-MM-dd');}
@@ -82,15 +82,22 @@ function syncTimetable_(){
 function reconcileRequests_(roster,summaries){const requests=read_('신청');let changed=false;for(const r of requests){if(!r.confirmedClassId||!r.confirmedName||r.status==='취소')continue;const matches=roster.filter(p=>p.classId===r.confirmedClassId&&p.name===r.confirmedName),summary=summaries.find(s=>s.classId===r.confirmedClassId);const p=matches.length===1?matches[0]:null;const next=summary&&summary.review!=='true'&&p&&['registered','starting'].includes(p.status)?STATUS[p.status]:'시간표 재확인';if(r.status!==next){r.status=next;changed=true;}}if(changed)write_('신청',requests);}
 function publicCatalog_(){
   const p=props_(),last=p.getProperty('LAST_SYNC');if(!last||!p.getProperty('PRIVACY_CONTACT'))throw new Error('운영자가 시간표와 상담 연락처를 준비 중입니다.');
-  const stale=Date.now()-Date.parse(last)>15*60000,classes=classes_(),summaries=read_('동기화'),configuration=configIssues_(classes);
+  const stale=catalogStale_(last),classes=classes_(),summaries=read_('동기화'),configuration=configIssues_(classes);
   const visible=classes.filter(c=>COURSE_GRADES.includes(courseGrade(c.grade))).map(c=>{const s=summaries.find(s=>s.classId===c.id),counts=s?capacity(s,classCapacity(c)):{used:0,remaining:0,over:false};return {id:c.id,grade:courseGrade(c.grade),title:c.title,lesson:classCurriculum(c,semester_())?.lesson||'',day:c.day,start:c.start,end:c.end,room:c.room,teacher:c.teacher,teacherColor:/^#[a-f0-9]{6}$/i.test(c.teacherColor)?c.teacherColor:'#e6ecd9',capacity:classCapacity(c),used:counts.used,remaining:counts.remaining,review:stale||!s||counts.over||!Number.isFinite(counts.used)||counts.used<0||s.configKey!==classKey_(c)||s.review==='true'||configuration[c.id].length>0};});
   const slots=generateOpeningSlots(classes,semester_());
   const requests=read_('신청');return {makeupEnabled:true,mode:'live',semester:semester_(),updatedAt:last,classes:visible,slots:stale?[]:slots,demand:aggregateDemand(requests),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT')};
 }
+// Anonymous display cache only. Submissions always validate uncached operations data.
+function catalogStale_(last){const time=Date.parse(last);return !Number.isFinite(time)||time>Date.now()||Date.now()-time>400*60000;}
+function invalidateCatalogCache_(){try{CacheService.getScriptCache().remove('public-catalog-v2');}catch(error){/* Cache is optional. */}}
+function cachedPublicCatalog_(){
+  let cache;try{cache=CacheService.getScriptCache();const raw=cache.get('public-catalog-v2');if(raw){const value=JSON.parse(raw);if(!catalogStale_(value.updatedAt))return value;}}catch(error){/* Fall back to validated data. */}
+  return locked_(()=>{const value=publicCatalog_();if(cache&&!catalogStale_(value.updatedAt)){try{cache.put('public-catalog-v2',JSON.stringify(value),300);}catch(error){/* Cache failure must not block reads. */}}return value;});
+}
 function doGet(e){
   if(e&&e.parameter&&['admin','legacyAdmin'].includes(e.parameter.action))return bookingAdminPage_(e.parameter.action);
   const callback=String(e&&e.parameter&&e.parameter.callback||'');if(callback&&!/^olta_[a-f0-9]{32}$/.test(callback))return ContentService.createTextOutput('{"error":"Invalid callback"}').setMimeType(ContentService.MimeType.JSON);
-  let result;try{result=locked_(()=>e&&e.parameter&&e.parameter.action==='reviews'?publicReviewCatalog_():e&&e.parameter&&e.parameter.action==='bookings'?bookingCatalog_():publicCatalog_());}catch(error){console.error('Catalog read failed: '+error.message);result={error:'시간표를 준비 중이거나 연결을 확인 중입니다. 잠시 후 다시 시도해 주세요.'};}
+  let result;try{result=e&&e.parameter&&e.parameter.action==='reviews'?locked_(()=>publicReviewCatalog_()):e&&e.parameter&&e.parameter.action==='bookings'?locked_(()=>bookingCatalog_()):cachedPublicCatalog_();}catch(error){console.error('Catalog read failed: '+error.message);result={error:'시간표를 준비 중이거나 연결을 확인 중입니다. 잠시 후 다시 시도해 주세요.'};}
   const json=JSON.stringify(result).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');return ContentService.createTextOutput(callback?callback+'('+json+');':json).setMimeType(callback?ContentService.MimeType.JAVASCRIPT:ContentService.MimeType.JSON);
 }
 function doPost(e){let result;try{result=locked_(()=>{const input=e&&e.parameter||{};return input.kind==='seminar_review'?submitReview_(input):['seminar','visit','absence','booking_cancel'].includes(input.kind)?submitBooking_(input):input.kind==='makeup'?submitMakeup_(input):submit_(input);});}catch(error){result={ok:false,message:error.message};}return e&&e.parameter&&e.parameter.kind==='seminar_review'?reviewReceipt_(result):e&&e.parameter&&['seminar','visit','absence','booking_cancel'].includes(e.parameter.kind)?bookingReceipt_(result):receipt_(result);}
@@ -157,7 +164,7 @@ function reviewMakeupRequest(id,status,teacher,room,verified){
   });
 }
 function savePause(input){admin_();return locked_(()=>{const rows=read_('휴원연락'),r=rows.find(r=>r.classId===input.classId&&r.student===input.student);if(!r)throw new Error('휴원 기록을 찾을 수 없습니다.');for(const key of ['pauseStart','pauseEnd','followUp']){const value=String(input[key]||'');if(value&&!/^\d{4}-\d{2}-\d{2}$/.test(value))throw new Error('날짜 형식을 확인하세요.');r[key]=value;}if(r.pauseStart&&r.pauseEnd&&r.pauseStart>r.pauseEnd)throw new Error('휴원 종료일을 확인하세요.');r.note=String(input.note||'').slice(0,300);if(input.contacted)r.contactedAt=now_();write_('휴원연락',rows);audit_('휴원 연락 기록 수정',r.classId);return true;});}
-function installTriggers(){admin_();const handlers=['scheduledSync_','cleanup_','syncTimetable'];ScriptApp.getProjectTriggers().filter(t=>handlers.includes(t.getHandlerFunction())).forEach(t=>ScriptApp.deleteTrigger(t));ScriptApp.newTrigger('scheduledSync_').timeBased().everyMinutes(5).create();ScriptApp.newTrigger('cleanup_').timeBased().everyDays(1).atHour(3).inTimezone('Asia/Seoul').create();return '설치 완료';}
+function installTriggers(){admin_();const handlers=['scheduledSync_','cleanup_','syncTimetable'];ScriptApp.getProjectTriggers().filter(t=>handlers.includes(t.getHandlerFunction())).forEach(t=>ScriptApp.deleteTrigger(t));for(const hour of [0,6,12,18])ScriptApp.newTrigger('scheduledSync_').timeBased().atHour(hour).nearMinute(0).everyDays(1).inTimezone('Asia/Seoul').create();ScriptApp.newTrigger('cleanup_').timeBased().everyDays(1).atHour(3).inTimezone('Asia/Seoul').create();console.log('시간표 자동 동기화: 한국 시간 00·06·12·18시 전후 / 매일 정리: 03시');return '6시간 동기화 설치 완료';}
 function cleanup_(){return locked_(()=>{const days=Number(props_().getProperty('RETENTION_DAYS')||90);if(!Number.isFinite(days)||days<1||days>365)throw new Error('보관 기간은 1~365일이어야 합니다.');const cutoff=Date.now()-days*86400000;cleanupBookings_(cutoff);if(db_().getSheetByName('보강신청'))write_('보강신청',makeupRequests_().filter(r=>Date.parse(r.createdAt)>=cutoff));write_('신청',read_('신청').filter(r=>Date.parse(r.createdAt)>=cutoff));write_('감사',read_('감사').filter(r=>Date.parse(r.time)>=cutoff));write_('보강',read_('보강').filter(r=>Date.parse(r.date+'T23:59:59+09:00')>=cutoff));});}
 
 
