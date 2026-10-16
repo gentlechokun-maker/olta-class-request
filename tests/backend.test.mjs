@@ -45,7 +45,7 @@ test('public catalog excludes roster/contacts and fails closed on stale or edite
   const tables={'동기화':[{classId:'c1',registered:'4',starting:'1',paused:'2',review:'false',configKey:r.classKey_(c)}],'빈시간':[{id:'s1',day:'월',start:'16:00',end:'17:00',room:'2교실',grades:'초3',enabled:'TRUE'}],'신청':[{kind:'new',targetId:'s1',grade:'초3',student:'비공개이름',phone:'01012345678',status:'접수'}]};r.read_=name=>tables[name];
   const good=r.publicCatalog_();assert.equal(good.classes[0].remaining,1);assert.equal(good.classes[0].review,false);assert.ok(good.slots.length>0);assert.ok(!JSON.stringify(good).includes('비공개이름'));assert.ok(!JSON.stringify(good).includes('01012345678'));assert.ok(!JSON.stringify(good).includes('C10:C12'));
   c.sourceRange='D10:D12';assert.equal(r.publicCatalog_().classes[0].review,true);
-  properties.LAST_SYNC=new Date(Date.now()-16*60000).toISOString();assert.equal(r.publicCatalog_().slots.length,0);
+  properties.LAST_SYNC=new Date(Date.now()-401*60000).toISOString();assert.equal(r.publicCatalog_().slots.length,0);
 });
 test('makeup capacity enforces date-specific six-seat limit and avoids counting blue names twice',()=>{
   const r=runtime();r.admin_=()=>true;r.locked_=f=>f();r.syncTimetable_=()=>true;r.today_=()=> '2026-10-13';r.audit_=()=>{};
@@ -59,3 +59,24 @@ test('makeup capacity enforces date-specific six-seat limit and avoids counting 
 });
 
 
+
+test('catalog cache bypasses locks on hits, invalidates, and rejects stale snapshots',()=>{
+  const r=runtime();let stored=null,reads=0,locks=0;
+  r.CacheService={getScriptCache:()=>({get:()=>stored,put:(key,value,ttl)=>{assert.equal(ttl,300);stored=value;},remove:()=>{stored=null;}})};
+  r.locked_=fn=>{locks++;return fn();};r.publicCatalog_=()=>{reads++;return {updatedAt:new Date().toISOString(),classes:[],slots:[]};};
+  r.cachedPublicCatalog_();r.cachedPublicCatalog_();assert.equal(reads,1);assert.equal(locks,1);
+  r.invalidateCatalogCache_();r.cachedPublicCatalog_();assert.equal(reads,2);
+  stored=JSON.stringify({updatedAt:new Date(Date.now()-401*60000).toISOString()});r.cachedPublicCatalog_();assert.equal(reads,3);
+  assert.equal(r.catalogStale_(new Date(Date.now()-390*60000).toISOString()),false);
+  assert.equal(r.catalogStale_('invalid'),true);
+  r.CacheService.getScriptCache=()=>{throw Error('cache unavailable');};r.cachedPublicCatalog_();assert.equal(reads,4);
+});
+
+test('trigger installation replaces only timetable and cleanup schedules with four Korean-time runs',()=>{
+  const r=runtime(),created=[],deleted=[];r.admin_=()=>true;
+  r.ScriptApp={getProjectTriggers:()=>['scheduledSync_','cleanup_','syncTimetable','unrelated'].map(name=>({getHandlerFunction:()=>name})),deleteTrigger:t=>deleted.push(t.getHandlerFunction()),newTrigger:handler=>{const spec={handler};const builder={};for(const method of ['timeBased','atHour','nearMinute','everyDays','inTimezone'])builder[method]=value=>{spec[method]=value;return builder;};builder.create=()=>created.push(spec);return builder;}};
+  r.installTriggers();assert.deepEqual(deleted,['scheduledSync_','cleanup_','syncTimetable']);
+  assert.deepEqual(created.filter(x=>x.handler==='scheduledSync_').map(x=>x.atHour),[0,6,12,18]);
+  for(const spec of created){assert.equal(spec.inTimezone,'Asia/Seoul');assert.equal(spec.everyDays,1);}
+  assert.equal(created.filter(x=>x.handler==='cleanup_').length,1);
+});
