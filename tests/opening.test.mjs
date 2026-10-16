@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {openingSlotAvailable,validateRequest} from '../public/domain.js';
+import {openingSlotAvailable,validateRequest,generateOpeningSlots} from '../public/domain.js';
 const slot={id:'free',day:'월',start:'15:00',end:'16:00',room:'2교실',grades:['초3']};
 const cls=(teacher,extra={})=>({...slot,room:'1교실',teacher,...extra});
 test('new classes require either Shin or Hong and an empty room',()=>{
@@ -27,4 +27,17 @@ test('existing class enrollment needs no visit date and full classes are rejecte
  const input={kind:'existing',targetId:'c1',grade:'초3',student:'예시학생',phone:'01012345678',consent:'yes',privacyVersion:'2026-10-13',requestId:'enrollment-test-0001'};
  assert.equal(validateRequest(input,{classes:[{id:'c1',grade:'초3',remaining:1}],slots:[]}).kind,'existing');
  assert.throws(()=>validateRequest(input,{classes:[{id:'c1',grade:'초3',remaining:0}],slots:[]}));
+});
+
+test('generated slots stay inside supplied windows and do not switch teachers mid-class',()=>{
+ const classes=[cls('신T',{day:'토',start:'13:00',end:'15:00'})];
+ const slots=generateOpeningSlots(classes);
+ assert.ok(slots.length>0);assert.ok(!slots.some(s=>s.day==='금'));
+ assert.ok(!slots.some(s=>s.day==='토'&&s.start==='13:00'));
+ assert.ok(slots.some(s=>s.day==='토'&&s.start==='12:00'&&s.end==='13:00'));
+ assert.ok(!slots.some(s=>s.day==='일'&&s.start==='12:00'));
+ assert.ok(slots.every(s=>s.end<='22:00'));
+ assert.ok(slots.some(s=>s.day==='일'&&s.start==='10:00'&&s.end==='12:00'&&s.grades.includes('초6')));
+ const alternating=[cls('신T',{day:'화',start:'16:00',end:'17:00'}),cls('홍T',{day:'화',start:'17:00',end:'18:00'})];
+ assert.ok(!generateOpeningSlots(alternating).some(s=>s.day==='화'&&s.start==='16:00'&&s.end==='18:00'));
 });

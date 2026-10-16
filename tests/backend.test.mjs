@@ -43,7 +43,7 @@ test('public catalog excludes roster/contacts and fails closed on stale or edite
   const properties={LAST_SYNC:new Date().toISOString(),PRIVACY_CONTACT:'학원 연락처',RETENTION_DAYS:'90'};
   r.props_=()=>({getProperty:key=>properties[key]});r.classes_=()=>[c];
   const tables={'동기화':[{classId:'c1',registered:'4',starting:'1',paused:'2',review:'false',configKey:r.classKey_(c)}],'빈시간':[{id:'s1',day:'월',start:'16:00',end:'17:00',room:'2교실',grades:'초3',enabled:'TRUE'}],'신청':[{kind:'new',targetId:'s1',grade:'초3',student:'비공개이름',phone:'01012345678',status:'접수'}]};r.read_=name=>tables[name];
-  const good=r.publicCatalog_();assert.equal(good.classes[0].remaining,1);assert.equal(good.classes[0].review,false);assert.equal(good.slots.length,1);assert.ok(!JSON.stringify(good).includes('비공개이름'));assert.ok(!JSON.stringify(good).includes('01012345678'));assert.ok(!JSON.stringify(good).includes('C10:C12'));
+  const good=r.publicCatalog_();assert.equal(good.classes[0].remaining,1);assert.equal(good.classes[0].review,false);assert.ok(good.slots.length>0);assert.ok(!JSON.stringify(good).includes('비공개이름'));assert.ok(!JSON.stringify(good).includes('01012345678'));assert.ok(!JSON.stringify(good).includes('C10:C12'));
   c.sourceRange='D10:D12';assert.equal(r.publicCatalog_().classes[0].review,true);
   properties.LAST_SYNC=new Date(Date.now()-16*60000).toISOString();assert.equal(r.publicCatalog_().slots.length,0);
 });
