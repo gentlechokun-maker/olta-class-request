@@ -1,4 +1,4 @@
-import {BOOKING_VERSION,bookingToday,bookingDay,bookingCategory,bookingInstant,seminarDeadline,curriculumWeek,absenceWindow,validateSeminar,validateVisit,validateAbsence} from './booking-domain.js';
+import {BOOKING_VERSION,bookingToday,bookingDay,bookingCategory,bookingInstant,seminarDeadline,curriculumWeek,absenceWindow,validateSeminar,validateVisit,validateAbsence,academicPeriods,weekLabel} from './booking-domain.js?v=20261018-weeks';
 import {demoCatalog} from './demo.js';
 const $=s=>document.querySelector(s),f=$('#booking-form'),cf=$('#cancel-form'),config=window.OLTA_CONFIG||{};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -31,24 +31,19 @@ function refreshClasses(){select(f.elements.targetId,classes().map(c=>({value:c.
 function refresh(){if(!catalog||kind==='cancel')return;
  if(kind==='seminar'){const e=catalog.seminars.find(e=>e.id===val('eventId'));$('#review-link').href='./review.html'+(e?'?eventId='+encodeURIComponent(e.id):'');$('#seminar-info').textContent=e?`${e.date} ${e.start}\n대면 잔여 ${e.remaining}명 / 20명 · ${e.location||'장소는 학원에 문의해 주세요.'}\n대면 취소: ${new Date(seminarDeadline(e.date,14)+9*3600000).toISOString().slice(0,10)} 14:00까지 / 신청: 같은 날 20:00까지\n온라인: 인원·신청 기한·취소 기한 제한 없음${e.onlineInfo?'\n'+e.onlineInfo:''}`:'설명회 일정을 선택해 주세요.';}
  if(kind==='visit'){let day='';try{day=bookingDay(val('visitDate'));}catch{}const category=val('grade')?bookingCategory(val('grade')):'';const times=['09:00','09:30','10:00','10:30','11:00','11:30'];select(f.elements.visitStart,times.map(time=>({value:time,text:time+' · 30분',disabled:!['월','화','수','목'].includes(day)||bookingInstant(val('visitDate'),time)<=Date.now()||catalog.visits.some(r=>r.date===val('visitDate')&&r.start===time&&r.category!==category)})),'상담 시간을 선택해 주세요');}
- if(kind==='absence'){const choice=val('choice'),isPass=choice==='pass';$('#makeup-details').hidden=isPass;f.elements.makeupDate.required=!isPass;$('#makeup-class-label').hidden=choice!=='same';$('#position-label').hidden=choice!=='adjacent';f.elements.makeupClassId.required=choice==='same';f.elements.makeupClassId.disabled=choice!=='same';f.elements.position.disabled=choice!=='adjacent';
- let text=isPass?'보강을 신청하지 않고 결석과 패스를 기록합니다.':'결석일과 보강일을 선택하면 달력의 수업 주차를 비교합니다.';
- try{const aw=curriculumWeek(val('absenceDate'),val('grade'),catalog.weeks);if(!isPass){const mw=curriculumWeek(val('makeupDate'),val('grade'),catalog.weeks);text=`결석: ${aw} / 보강: ${mw}\n`+(aw===mw?'같은 주차입니다. 같은 학년의 빈자리 수업을 선택해 주세요.':'다른 주차입니다. 초등 30분, 중·고등 1시간을 정규 수업 전후에 신청해 주세요.');if(choice==='adjacent'){const cls=catalog.classes.find(c=>c.id===val('targetId'));if(cls){const w=absenceWindow(cls,val('position'));text+=`\n희망 보강: ${w.start}–${w.end} · ${w.minutes}분`;}}}else text=`결석 주차: ${aw}\n보강 패스를 기록합니다.`;}catch(e){if(val('absenceDate'))text=e.message;}
- $('#week-info').textContent=text;
- let day='';try{day=bookingDay(val('makeupDate'));}catch{}
- select(f.elements.makeupClassId,catalog.classes.filter(c=>c.grade===val('grade')&&c.id!==val('targetId')&&!c.review&&c.day===day).map(c=>{const remaining=Math.max(0,c.remaining-(catalog.makeupSeats[c.id+'|'+val('makeupDate')]||0));return {value:c.id,text:label(c)+` · ${remaining}자리 (접수 시 재확인)`,disabled:remaining<1};}),'빈자리가 있는 수업을 선택해 주세요');
- }
+ if(kind==='absence')refreshAbsence();
 }
 async function load(){catalog=null;$('#application').hidden=true;$('#cancellation').hidden=true;$('#retry').hidden=true;$('#connection').textContent='일정을 불러오고 있습니다.';try{if(!config.apiUrl){catalog={...demoCatalog(),mode:'demo',bookingEnabled:true,weeks:await(await fetch('./calendar-2026.json')).json(),seminars:[{id:'sample',title:'예시 설명회',date:'2026-11-15',start:'14:00',location:'예시 강의실',enabled:'true',remaining:20}],visits:[],makeupSeats:{}};}else{if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(config.apiUrl))throw Error('운영 서버 주소를 확인해 주세요.');catalog=await jsonp();if(!catalog.bookingEnabled)throw Error('예약 기능 서버 업데이트가 필요합니다. 학원에 문의해 주세요.');}
  $('#connection').textContent=catalog.mode==='demo'?'미리보기 · 입력 내용은 저장되지 않습니다.':'예약 서버 연결됨 · 모든 시간은 한국 시간입니다.';
  if(kind==='cancel'){$('#cancellation').hidden=false;if(receipt){cf.elements.id.value=receipt.id;cf.elements.token.value=receipt.token;}return;}
  $('#application').hidden=false;f.elements.kind.value=kind;f.elements.requestId.value=crypto.randomUUID();f.elements.token.value=randomToken();f.elements.privacyVersion.value=BOOKING_VERSION;
  const grades=['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1'];select(f.elements.grade,grades.map(g=>({value:g,text:g})));showField('#seminar-fields',kind==='seminar');showField('#class-fields',kind!=='seminar');showField('#visit-fields',kind==='visit');showField('#absence-fields',kind==='absence');
+ $('#school-label').hidden=kind==='absence';f.elements.school.disabled=kind==='absence';f.elements.school.required=kind!=='absence';
  $('#title').textContent={seminar:'설명회 안내',visit:'30분 방문 상담 예약',absence:'결석·보강 예약'}[kind];$('#submit').textContent=kind==='seminar'?'설명회 참석 신청하기 ↗':'신청하기 ↗';$('#guide').textContent={seminar:'대면 설명회는 선착순 20명입니다. 온라인 설명회는 인원 제한 없이 신청하실 수 있습니다.',visit:'희망하는 반을 선택하고 방문 일정을 예약해 주세요. 수강 등록은 상담 후 시간표에 반영된 것을 확인하여 확정합니다.',absence:'결석한 수업 내용을 보강합니다. 같은 수업 주차는 동일 학년 빈자리 수업, 다른 주차는 재원 중인 수업 전후로 신청합니다. 보강은 관리자 확인 후 확정됩니다.'}[kind];
  select(f.elements.eventId,catalog.seminars.map(e=>({value:e.id,text:e.title+' · '+e.date+' '+e.start})),catalog.seminars.length?'설명회 선택':'현재 신청 가능한 설명회가 없습니다');
  const target=catalog.classes.find(c=>c.id===params.get('targetId'));if(target)f.elements.grade.value=target.grade;refreshClasses();if(target)f.elements.targetId.value=target.id;
- f.elements.absenceDate.max=bookingToday();f.elements.visitDate.min=bookingToday();f.elements.makeupDate.min=bookingToday();
- $('#privacy').textContent=`처리 주체: 올타과학 / 수집: 학부모 이름·연락처, 학생 이름·학년·학교, 신청 일정과 결석·보강 내용 / 목적: 설명회·상담·보강 예약 및 연락 / 보관: 접수일과 예약일 중 늦은 날부터 ${Number(catalog.retentionDays)||90}일 후 삭제 / 동의를 거부할 수 있으나 온라인 접수는 제한됩니다. 문의·삭제 요청: ${catalog.privacyContact||'010-5725-6442'}. 정보는 비공개 운영 문서에만 저장합니다.`;refresh();
+ f.elements.visitDate.min=bookingToday();
+ $('#privacy').textContent=`처리 주체: 올타과학 / 수집: 학부모 이름·연락처, 학생 이름·학년${kind==='absence'?'':'·학교'}, 신청 일정과 결석·보강 주차 / 목적: 설명회·상담·보강 예약 및 연락 / 보관: 접수일과 예약일 중 늦은 날부터 ${Number(catalog.retentionDays)||90}일 후 삭제 / 동의를 거부할 수 있으나 온라인 접수는 제한됩니다. 문의·삭제 요청: ${catalog.privacyContact||'010-5725-6442'}. 정보는 비공개 운영 문서에만 저장합니다.`;refresh();
  }catch(e){$('#connection').textContent=e.message+' 신청은 일시 중지됩니다.';$('#retry').hidden=false;}}
 f.addEventListener('change',e=>{if(e.target.name==='grade')refreshClasses();refresh();});
 f.addEventListener('submit',e=>{e.preventDefault();$('#form-status').textContent='';const input=Object.fromEntries(new FormData(f));if(kind==='visit'){input.date=input.visitDate;input.start=input.visitStart;}if(kind==='absence')input.date=input.choice==='pass'?'':input.makeupDate;
@@ -56,3 +51,28 @@ f.addEventListener('submit',e=>{e.preventDefault();$('#form-status').textContent
 cf.addEventListener('submit',e=>{e.preventDefault();if(!catalog)return;if(catalog.mode==='demo'){$('#cancel-status').textContent='미리보기에서는 실제 취소되지 않습니다.';return;}cf.action=config.apiUrl;HTMLFormElement.prototype.submit.call(cf);$('#cancel-status').textContent='새 창에서 취소 결과를 확인해 주세요.';});
 document.querySelector(`nav a[href="?kind=${kind}"]`)?.setAttribute('aria-current','page');$('#retry').onclick=load;load();
 
+
+function refreshAbsence(){
+ const cls=catalog.classes.find(c=>c.id===val('targetId')),periods=academicPeriods(val('grade'),catalog.weeks);
+ const absencePeriods=cls?periods.filter(p=>p.dates.filter(d=>bookingDay(d)===cls.day).length===1):[];
+ const makeupPeriods=periods.filter(p=>p.dates.some(d=>d>=bookingToday()));
+ for(const [prefix,list] of [['absence',absencePeriods],['makeup',makeupPeriods]]){
+  const months=[...new Set(list.map(p=>p.month))];select(f.elements[prefix+'Month'],months.map(m=>({value:m,text:m.slice(0,4)+'년 '+Number(m.slice(5))+'월'})),'월 선택');
+  select(f.elements[prefix+'Period'],list.filter(p=>p.month===val(prefix+'Month')).map(p=>({value:p.id,text:weekLabel(p.id)})),'주차 선택');
+ }
+ const aw=absencePeriods.find(p=>p.id===val('absencePeriod')),mw=makeupPeriods.find(p=>p.id===val('makeupPeriod')),pass=val('makeupPlan')==='pass';
+ f.elements.absenceDate.value=aw&&cls?aw.dates.filter(d=>bookingDay(d)===cls.day)[0]||'':'';
+ f.elements.absenceWeek.value=aw?.id||'';f.elements.weekId.value=pass?'':mw?.id||'';
+ $('#makeup-details').hidden=pass;for(const n of ['makeupMonth','makeupPeriod','makeupSession']){f.elements[n].disabled=pass;f.elements[n].required=!pass;}
+ f.elements.choice.value=pass?'pass':aw&&mw?(aw.id===mw.id?'same':'adjacent'):'';
+ const options=[];
+ if(aw&&mw&&cls&&!pass)for(const date of mw.dates){
+  if(date<bookingToday())continue;
+  if(aw.id===mw.id){for(const c of catalog.classes.filter(c=>c.id!==cls.id&&c.grade===cls.grade&&!c.review&&c.day===bookingDay(date)&&c.end<='22:00')){const remaining=c.remaining-(catalog.makeupSeats?.[c.id+'|'+date]||0);if(remaining>0&&bookingInstant(date,c.start)>Date.now())options.push({value:c.id+'|'+date+'|same',text:date+' ('+c.day+') '+c.start+'–'+c.end+' · '+c.title+' · '+c.room});}}
+  else if(bookingDay(date)===cls.day){for(const position of ['before','after']){try{const w=absenceWindow(cls,position);if(bookingInstant(date,w.start)>Date.now())options.push({value:cls.id+'|'+date+'|'+position,text:date+' ('+cls.day+') '+w.start+'–'+w.end+' · 수업 '+(position==='before'?'전':'후')+' 30분'});}catch{}}}
+ }
+ select(f.elements.makeupSession,options,options.length?'보강 시간 선택':'선택 가능한 보강 시간이 없습니다');
+ const chosen=options.find(o=>o.value===val('makeupSession'));const parts=chosen?chosen.value.split('|'):[];
+ f.elements.makeupClassId.value=pass?'':parts[0]||'';f.elements.makeupDate.value=pass?'':parts[1]||'';f.elements.position.value=pass?'':parts[2]||'';
+ $('#week-info').textContent=!cls?'먼저 학년과 정규반을 선택해 주세요.':!aw?'결석할 수업의 월과 주차를 선택해 주세요.':weekLabel(aw.id)+' 수업 · 결석일 '+val('absenceDate')+(pass?' / 보강 패스':!mw?' / 보강할 월과 주차를 선택해 주세요.':aw.id===mw.id?' / 같은 학년의 빈자리 수업에서 보강합니다.':' / '+weekLabel(mw.id)+' 정규 수업 전후 30분으로 보강합니다.');
+}
