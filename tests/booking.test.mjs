@@ -27,3 +27,19 @@ test('new administrator endpoints reject anonymous callers',()=>{const {ctx}=boo
  test('absence needs no school or topic; future absence and pass retain the academic week',()=>{const input={...identity,school:'',targetId:'c',absenceDate:'2026-10-19',choice:'pass'};const r=validateAbsence(input,{classes:[cls],weeks},now);assert.equal(r.school,'');assert.equal(r.missedTopic,'');assert.equal(r.absenceWeek,'2026-10-W2');assert.throws(()=>validateAbsence({...input,absenceWeek:'2026-10-W3'},{classes:[cls],weeks},now),/일치/);});
 
 test('month selectors preserve academic month across calendar month boundary',()=>{const p=academicPeriods('초4',weeks);const october=p.find(x=>x.id==='2026-10-W4');assert.equal(october.month,'2026-10');assert.ok(october.dates.includes('2026-11-02'));assert.equal(weekLabel(october.id),'2026년 10월 4주차');assert.ok(!p.some(x=>x.id==='CLOSED'));const conflict=[...weeks,{date:'2026-11-02',grade:'초4',weekId:'REVIEW'}];assert.ok(!academicPeriods('초4',conflict).find(x=>x.id===october.id).dates.includes('2026-11-02'));});
+
+test('admin confirms final makeup seat without counting itself; other reservations still block',()=>{
+ const source=fs.readFileSync('apps-script/Booking.gs','utf8');
+ const regular={...cls,day:'수'},target={...cls,id:'d',day:'금',remaining:1,teacher:'신T',room:'1교실'};
+ const request={...identity,id:identity.requestId,targetId:'c',absenceDate:'2026-10-14',choice:'same',date:'2026-10-16',start:'17:00',end:'18:00',makeupClassId:'d',status:'접수'};
+ let rows=[{...request}],writes=0;
+ const ctx=vm.createContext({BOOKING_VERSION,validateAbsence:(input,catalog)=>validateAbsence(input,catalog,now),publicCatalog_:()=>({classes:[regular,target]}),enabled_:()=>true,admin_:()=>{},locked_:fn=>fn(),syncTimetable_:()=>{},classes_:()=>[regular,target],today_:()=> '2026-10-15',read_:name=>name==='원생'?[{classId:'c',name:identity.student,status:'registered'}]:[],write_:(name,value)=>{rows=value;writes++;},audit_:()=>{}});
+ vm.runInContext(source,ctx);ctx.ensureBookings_=()=>{};ctx.bookingRead_=name=>name==='결석보강'?rows:name==='수업주차'?weeks:[];
+ assert.equal(vm.runInContext("bookingCatalog_().makeupSeats['d|2026-10-16']",ctx),1);
+ assert.equal(vm.runInContext("updateBookingStatus('absence','test-request-00000001','확정','','',true)",ctx),true);
+ assert.equal(rows[0].status,'확정');assert.equal(writes,1);
+ rows=[{...request},{...request,id:'other-request',student:'다른학생'}];writes=0;
+ assert.throws(()=>vm.runInContext("updateBookingStatus('absence','test-request-00000001','확정','','',true)",ctx),/마감/);
+ assert.equal(writes,0);assert.equal(rows[0].status,'접수');
+ rows[1].status='취소';assert.doesNotThrow(()=>vm.runInContext("updateBookingStatus('absence','test-request-00000001','확정','','',true)",ctx));
+});
