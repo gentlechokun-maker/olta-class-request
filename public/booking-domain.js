@@ -29,3 +29,19 @@ export function validateConsultation(input,catalog,now=Date.now()){
  const slot=consultationSlots(type,date,catalog,now).find(s=>s.start===start);if(!slot)throw Error('상담 가능한 시간이 아니거나 이미 예약되었습니다. 날짜와 시간을 다시 선택해 주세요.');
  return {...r,consultationType:type,date,...slot};
 }
+
+// Calendar-based choices share the same academic-week IDs as server validation.
+export function absenceDates(cls,weeks,now=Date.now()){
+ if(!cls||cls.review)return [];
+ return [...new Set(weeks.map(w=>w.date))].sort().filter(date=>{try{return date>=bookingToday(now)&&bookingDay(date)===cls.day&&bookingInstant(date,cls.start)>now&&/^\d{4}-\d{2}-W\d+$/.test(curriculumWeek(date,cls.grade,weeks));}catch{return false;}});
+}
+export function makeupChoices(cls,absenceDate,date,catalog,now=Date.now()){
+ if(!cls||cls.review||date<bookingToday(now))return [];
+ let original,week;try{original=curriculumWeek(absenceDate,cls.grade,catalog.weeks);week=curriculumWeek(date,cls.grade,catalog.weeks);}catch{return [];}
+ if(original===week)return catalog.classes.filter(c=>c.id!==cls.id&&c.grade===cls.grade&&!c.review&&c.day===bookingDay(date)&&c.end<='22:00'&&c.remaining-(catalog.makeupSeats?.[c.id+'|'+date]||0)>0&&bookingInstant(date,c.start)>now).map(c=>({classId:c.id,date,position:'same',start:c.start,end:c.end,title:c.title,room:c.room,choice:'same'}));
+ if(bookingDay(date)!==cls.day)return [];
+ return ['before','after'].flatMap(position=>{try{const w=absenceWindow(cls,position);return bookingInstant(date,w.start)>now?[{classId:cls.id,date,position,...w,choice:'adjacent'}]:[];}catch{return [];}});
+}
+export function validateFutureAbsence(input,cls,now=Date.now()){
+ const date=bookingDate(input.absenceDate);if(!cls||date<bookingToday(now)||bookingInstant(date,cls.start)<=now)throw Error('결석할 수업은 오늘 이후 아직 시작하지 않은 날짜와 시간을 선택해 주세요.');
+}

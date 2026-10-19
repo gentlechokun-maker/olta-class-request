@@ -1,4 +1,4 @@
-import {BOOKING_VERSION,bookingToday,bookingDay,bookingCategory,bookingInstant,seminarDeadline,curriculumWeek,absenceWindow,validateSeminar,validateVisit,validateAbsence,academicPeriods,weekLabel,consultationSlots,validateConsultation} from './booking-domain.js?v=20261019-consultation';
+import {BOOKING_VERSION,bookingToday,bookingDay,bookingCategory,bookingInstant,seminarDeadline,curriculumWeek,absenceWindow,validateSeminar,validateVisit,validateAbsence,academicPeriods,weekLabel,consultationSlots,validateConsultation,absenceDates,makeupChoices,validateFutureAbsence} from './booking-domain.js?v=20261019-dates';
 import {demoCatalog} from './demo.js';
 const $=s=>document.querySelector(s),f=$('#booking-form'),cf=$('#cancel-form'),config=window.OLTA_CONFIG||{};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -47,34 +47,51 @@ async function load(){catalog=null;$('#application').hidden=true;$('#cancellatio
  }catch(e){$('#connection').textContent=e.message+' 신청은 일시 중지됩니다.';$('#retry').hidden=false;}}
 f.addEventListener('change',e=>{if(e.target.name==='grade')refreshClasses();refresh();});
 f.addEventListener('submit',e=>{e.preventDefault();$('#form-status').textContent='';const input=Object.fromEntries(new FormData(f));if(kind==='consultation'){input.date=input.consultationDate;input.start=input.consultationStart;}if(kind==='visit'){input.date=input.visitDate;input.start=input.visitStart;}if(kind==='absence')input.date=input.choice==='pass'?'':input.makeupDate;
- try{if(kind==='consultation')validateConsultation(input,catalog);if(kind==='seminar'){const event=catalog.seminars.find(e=>e.id===input.eventId);validateSeminar(input,event,[]);if(input.mode==='onsite'&&event.remaining<1)throw Error('대면 설명회 정원이 마감되었습니다.');}if(kind==='visit')validateVisit(input,catalog.classes.find(c=>c.id===input.targetId),catalog.visits);if(kind==='absence')validateAbsence(input,catalog);if(catalog.mode==='demo'){$('#form-status').textContent='예시 신청 확인 완료. 실제 접수되거나 저장되지 않았습니다.';return;}for(const n of ['date','start']){let el=f.querySelector(`input[type=hidden][name=${n}]`);if(!el){el=document.createElement('input');el.type='hidden';el.name=n;f.append(el);}el.value=input[n]||'';}f.action=config.apiUrl;HTMLFormElement.prototype.submit.call(f);$('#form-status').textContent='새 창의 접수 결과를 확인해 주세요. 성공 결과가 있어야 접수 완료입니다.';}catch(err){$('#form-status').textContent=err.message;}});
+ try{if(kind==='consultation')validateConsultation(input,catalog);if(kind==='seminar'){const event=catalog.seminars.find(e=>e.id===input.eventId);validateSeminar(input,event,[]);if(input.mode==='onsite'&&event.remaining<1)throw Error('대면 설명회 정원이 마감되었습니다.');}if(kind==='visit')validateVisit(input,catalog.classes.find(c=>c.id===input.targetId),catalog.visits);if(kind==='absence'){validateFutureAbsence(input,catalog.classes.find(c=>c.id===input.targetId));validateAbsence(input,catalog);}if(catalog.mode==='demo'){$('#form-status').textContent='예시 신청 확인 완료. 실제 접수되거나 저장되지 않았습니다.';return;}for(const n of ['date','start']){let el=f.querySelector(`input[type=hidden][name=${n}]`);if(!el){el=document.createElement('input');el.type='hidden';el.name=n;f.append(el);}el.value=input[n]||'';}f.action=config.apiUrl;HTMLFormElement.prototype.submit.call(f);$('#form-status').textContent='새 창의 접수 결과를 확인해 주세요. 성공 결과가 있어야 접수 완료입니다.';}catch(err){$('#form-status').textContent=err.message;}});
 cf.addEventListener('submit',e=>{e.preventDefault();if(!catalog)return;if(catalog.mode==='demo'){$('#cancel-status').textContent='미리보기에서는 실제 취소되지 않습니다.';return;}cf.action=config.apiUrl;HTMLFormElement.prototype.submit.call(cf);$('#cancel-status').textContent='새 창에서 취소 결과를 확인해 주세요.';});
 document.querySelector(`nav a[href="?kind=${kind}"]`)?.setAttribute('aria-current','page');$('#retry').onclick=load;load();
 
 
-function refreshAbsence(){
- const cls=catalog.classes.find(c=>c.id===val('targetId')),periods=academicPeriods(val('grade'),catalog.weeks);
- const absencePeriods=cls?periods.filter(p=>p.dates.filter(d=>bookingDay(d)===cls.day).length===1):[];
- const makeupPeriods=periods.filter(p=>p.dates.some(d=>d>=bookingToday()));
- for(const [prefix,list] of [['absence',absencePeriods],['makeup',makeupPeriods]]){
-  const months=[...new Set(list.map(p=>p.month))];select(f.elements[prefix+'Month'],months.map(m=>({value:m,text:m.slice(0,4)+'년 '+Number(m.slice(5))+'월'})),'월 선택');
-  select(f.elements[prefix+'Period'],list.filter(p=>p.month===val(prefix+'Month')).map(p=>({value:p.id,text:weekLabel(p.id)})),'주차 선택');
- }
- const aw=absencePeriods.find(p=>p.id===val('absencePeriod')),mw=makeupPeriods.find(p=>p.id===val('makeupPeriod')),pass=val('makeupPlan')==='pass';
- f.elements.absenceDate.value=aw&&cls?aw.dates.filter(d=>bookingDay(d)===cls.day)[0]||'':'';
- f.elements.absenceWeek.value=aw?.id||'';f.elements.weekId.value=pass?'':mw?.id||'';
- $('#makeup-details').hidden=pass;for(const n of ['makeupMonth','makeupPeriod','makeupSession']){f.elements[n].disabled=pass;f.elements[n].required=!pass;}
- f.elements.choice.value=pass?'pass':aw&&mw?(aw.id===mw.id?'same':'adjacent'):'';
- const options=[];
- if(aw&&mw&&cls&&!pass)for(const date of mw.dates){
-  if(date<bookingToday())continue;
-  if(aw.id===mw.id){for(const c of catalog.classes.filter(c=>c.id!==cls.id&&c.grade===cls.grade&&!c.review&&c.day===bookingDay(date)&&c.end<='22:00')){const remaining=c.remaining-(catalog.makeupSeats?.[c.id+'|'+date]||0);if(remaining>0&&bookingInstant(date,c.start)>Date.now())options.push({value:c.id+'|'+date+'|same',text:date+' ('+c.day+') '+c.start+'–'+c.end+' · '+c.title+' · '+c.room});}}
-  else if(bookingDay(date)===cls.day){for(const position of ['before','after']){try{const w=absenceWindow(cls,position);if(bookingInstant(date,w.start)>Date.now())options.push({value:cls.id+'|'+date+'|'+position,text:date+' ('+cls.day+') '+w.start+'–'+w.end+' · 수업 '+(position==='before'?'전':'후')+' 30분'});}catch{}}}
- }
- select(f.elements.makeupSession,options,options.length?'보강 시간 선택':'선택 가능한 보강 시간이 없습니다');
- const chosen=options.find(o=>o.value===val('makeupSession'));const parts=chosen?chosen.value.split('|'):[];
- f.elements.makeupClassId.value=pass?'':parts[0]||'';f.elements.makeupDate.value=pass?'':parts[1]||'';f.elements.position.value=pass?'':parts[2]||'';
- $('#week-info').textContent=!cls?'먼저 학년과 정규반을 선택해 주세요.':!aw?'결석할 수업의 월과 주차를 선택해 주세요.':weekLabel(aw.id)+' 수업 · 결석일 '+val('absenceDate')+(pass?' / 보강 패스':!mw?' / 보강할 월과 주차를 선택해 주세요.':aw.id===mw.id?' / 같은 학년의 빈자리 수업에서 보강합니다.':' / '+weekLabel(mw.id)+' 정규 수업 전후 30분으로 보강합니다.');
-}
 
-function refreshConsultation(){const type=val('consultationType');$('#consultation-guide').textContent=type==='director-phone'?'원장 상담 · 전화만 가능 · 오전 10~11시 / 오후 8~9시':type==='student-visit'?'재원생 방문 상담 · 오전 10시~정오 12시':'재원생 전화 상담 · 오후 2~10시 중 신T 수업과 상담 예약이 없는 시간';const slots=consultationSlots(type,val('consultationDate'),catalog);select(f.elements.consultationStart,slots.map(s=>({value:s.start,text:s.start+'–'+s.end})),val('consultationDate')?'상담 시간 선택 (가능한 시간만 표시)':'먼저 날짜를 선택해 주세요');if(val('consultationDate')&&!slots.length)$('#consultation-guide').textContent+=' / 선택한 날짜에는 예약 가능한 시간이 없습니다.';}
+function refreshConsultation(){const type=val('consultationType');$('#consultation-guide').textContent=type==='director-phone'?'원장 상담 · 전화만 가능 · 오전 10~11시 / 오후 8~9시':type==='student-visit'?'재원생 방문 상담 · 오전 10시~정오 12시':'재원생 전화 상담 · 오후 2~10시 중 수업 및 다른 상담 일정과 겹치지 않는 시간';const slots=consultationSlots(type,val('consultationDate'),catalog);select(f.elements.consultationStart,slots.map(s=>({value:s.start,text:s.start+'–'+s.end})),val('consultationDate')?'상담 시간 선택 (가능한 시간만 표시)':'먼저 날짜를 선택해 주세요');if(val('consultationDate')&&!slots.length)$('#consultation-guide').textContent+=' / 선택한 날짜에는 예약 가능한 시간이 없습니다.';}
+
+const calendarView={absence:'',makeup:''};
+function dateWeek(date){try{return curriculumWeek(date,val('grade'),catalog.weeks);}catch{return '';}}
+function dateText(date){return Number(date.slice(5,7))+'월 '+Number(date.slice(8))+'일 ('+bookingDay(date)+')';}
+function drawCalendar(prefix,allowed,originalWeek){
+ const today=bookingToday(),dates=[...new Set(catalog.weeks.map(w=>w.date))].filter(d=>d>=today).sort(),months=[...new Set(dates.map(d=>d.slice(0,7)))];
+ if(!months.includes(calendarView[prefix]))calendarView[prefix]=months[0]||'';
+ const month=calendarView[prefix],chosen=val(prefix+'Date'),monthEl=$('#'+prefix+'-calendar-month');
+ monthEl.innerHTML=months.map(m=>`<option value="${m}">${m.slice(0,4)}년 ${Number(m.slice(5))}월</option>`).join('');monthEl.value=month;monthEl.disabled=!months.length;
+ const buttons=document.querySelectorAll('[data-calendar-nav="'+prefix+'"]');buttons.forEach(b=>b.disabled=!month||(Number(b.dataset.step)<0?months.indexOf(month)<=0:months.indexOf(month)>=months.length-1));
+ let html=['일','월','화','수','목','금','토'].map(d=>'<span class="calendar-weekday">'+d+'</span>').join('');
+ if(month){const [year,m]=month.split('-').map(Number),first=new Date(Date.UTC(year,m-1,1)).getUTCDay(),last=new Date(Date.UTC(year,m,0)).getUTCDate();html+='<span aria-hidden="true"></span>'.repeat(first);
+  for(let day=1;day<=last;day++){const date=month+'-'+String(day).padStart(2,'0');if(date<today){html+='<span class="calendar-past" aria-hidden="true"></span>';continue;}
+   const week=dateWeek(date),match=/-W([1-4])$/.exec(week),same=originalWeek&&week===originalWeek,relation=prefix==='makeup'&&originalWeek&&week?(same?'same':'different'):'',available=allowed.has(date),label=dateText(date)+' · '+(week?weekLabel(week):'휴원 또는 주차 확인 필요')+(relation?(same?' · 같은 수업 월·주차':' · 다른 수업 월·주차'):'')+(available?'':' · 선택 불가');
+   html+=`<button type="button" class="calendar-day ${match?'week-'+match[1]:'week-closed'} ${relation}" data-calendar="${prefix}" data-date="${date}" aria-label="${esc(label)}" aria-pressed="${date===chosen}" ${available?'':'disabled'}><strong>${day}</strong><small>${match?Number(week.slice(5,7))+'월 '+match[1]+'주':'휴원/확인'}</small>${relation?'<span class="relation-symbol" aria-hidden="true">'+(same?'●':'◆')+'</span>':''}</button>`;
+  }
+ }
+ $('#'+prefix+'-calendar').innerHTML=html;
+ const selected=$('#'+prefix+'-selected');selected.className='date-selected '+(chosen?'week-'+(dateWeek(chosen).match(/-W([1-4])$/)?.[1]||'closed'):'');selected.textContent=chosen?dateText(chosen)+' · '+weekLabel(dateWeek(chosen)):'날짜를 선택해 주세요.';
+}
+function refreshAbsence(){
+ const cls=catalog.classes.find(c=>c.id===val('targetId')),allowed=new Set(absenceDates(cls,catalog.weeks)),pass=val('makeupPlan')==='pass';
+ if(!allowed.has(val('absenceDate')))f.elements.absenceDate.value='';
+ const absence=val('absenceDate'),originalWeek=absence?dateWeek(absence):'';
+ const candidateDates=[...new Set(catalog.weeks.map(w=>w.date))].filter(d=>d>=bookingToday());
+ const makeupDates=new Set(absence?candidateDates.filter(d=>makeupChoices(cls,absence,d,catalog).length):[]);
+ if(pass||!makeupDates.has(val('makeupDate')))f.elements.makeupDate.value='';
+ const date=val('makeupDate'),week=date?dateWeek(date):'';
+ f.elements.absenceWeek.value=originalWeek;f.elements.weekId.value=week;f.elements.choice.value=pass?'pass':originalWeek&&week?(originalWeek===week?'same':'adjacent'):'';
+ $('#makeup-details').hidden=pass;f.elements.makeupSession.disabled=pass;f.elements.makeupSession.required=!pass;
+ drawCalendar('absence',allowed,'');drawCalendar('makeup',makeupDates,originalWeek);
+ const choices=date&&absence&&!pass?makeupChoices(cls,absence,date,catalog):[];
+ const options=choices.map(c=>({value:c.classId+'|'+c.position,text:c.start+'–'+c.end+(c.choice==='same'?' · '+c.title+' · '+c.room:' · 수업 '+(c.position==='before'?'전':'후')+' 30분')}));
+ select(f.elements.makeupSession,options,options.length?'보강 시간 선택':'먼저 보강 가능한 날짜를 선택해 주세요');
+ const chosen=choices.find(c=>c.classId+'|'+c.position===val('makeupSession'));f.elements.makeupClassId.value=chosen?.classId||'';f.elements.position.value=chosen?.position||'';
+ $('#week-info').textContent=!cls?'먼저 학년과 재원 중인 정규반을 선택해 주세요.':!absence?'결석할 수업 날짜를 선택해 주세요.':weekLabel(originalWeek)+' 수업 · '+dateText(absence)+' 결석'+(pass?' / 보강 패스':!date?' / 보강할 날짜를 선택해 주세요.':originalWeek===week?' / 같은 수업 월·주차입니다. 결석하는 정규반을 제외한 같은 학년 빈자리 수업에서 보강합니다.':' / '+weekLabel(week)+'입니다. 다른 수업 월·주차이므로 정규 수업 전후 30분으로 보강합니다.');
+}
+f.addEventListener('click',e=>{const day=e.target.closest('[data-calendar]'),nav=e.target.closest('[data-calendar-nav]');if(day&&!day.disabled){f.elements[day.dataset.calendar+'Date'].value=day.dataset.date;refreshAbsence();}if(nav&&!nav.disabled){const prefix=nav.dataset.calendarNav,opts=[...$('#'+prefix+'-calendar-month').options].map(o=>o.value);calendarView[prefix]=opts[opts.indexOf(calendarView[prefix])+Number(nav.dataset.step)];refreshAbsence();}});
+for(const prefix of ['absence','makeup'])$('#'+prefix+'-calendar-month').addEventListener('change',e=>{calendarView[prefix]=e.target.value;refreshAbsence();});
+let dateBoundary=bookingToday();function refreshDateBoundary(){if(catalog&&kind==='absence'&&bookingToday()!==dateBoundary){dateBoundary=bookingToday();refreshAbsence();}}
+document.addEventListener('visibilitychange',refreshDateBoundary);setInterval(refreshDateBoundary,60000);
