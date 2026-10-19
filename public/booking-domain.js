@@ -15,3 +15,17 @@ export function validateAbsence(input,catalog,now=Date.now()){const r=bookingIde
 
 export function weekLabel(id){const m=/^(\d{4})-(\d{2})-W(\d+)$/.exec(String(id||''));return m?m[1]+'년 '+Number(m[2])+'월 '+Number(m[3])+'주차':String(id||'주차 확인 필요');}
 export function academicPeriods(grade,weeks){const result=new Map();for(const date of [...new Set(weeks.map(w=>w.date))].sort()){try{const id=curriculumWeek(date,grade,weeks);if(!/^\d{4}-\d{2}-W\d+$/.test(id))continue;if(!result.has(id))result.set(id,{id,month:id.slice(0,7),label:weekLabel(id),dates:[]});result.get(id).dates.push(date);}catch{}}return [...result.values()].sort((a,b)=>a.id.localeCompare(b.id));}
+
+export function consultationLabel(type){return {'director-phone':'원장 전화 상담','student-visit':'재원생 방문 상담','student-phone':'재원생 전화 상담'}[type]||'';}
+export function consultationSlots(type,date,catalog,now=Date.now()){
+ if(!consultationLabel(type))return [];try{if(!['월','화','수','목','금'].includes(bookingDay(date)))return [];}catch{return [];}
+ if(!catalog.consultationEnabled||!Array.isArray(catalog.consultationBusy)||!Array.isArray(catalog.shinBusy))return [];
+ const starts=type==='director-phone'?[600,630,1200,1230]:type==='student-visit'?[600,630,660,690]:Array.from({length:16},(_,i)=>840+i*30);
+ const fmt=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+ return starts.map(n=>({start:fmt(n),end:fmt(n+30)})).filter(s=>bookingInstant(date,s.start)>now&&!catalog.consultationBusy.some(b=>b.date===date&&s.start<b.end&&b.start<s.end)&&!(type==='student-phone'&&catalog.shinBusy.some(b=>(b.date?b.date===date:b.day===bookingDay(date))&&s.start<b.end&&b.start<s.end)));
+}
+export function validateConsultation(input,catalog,now=Date.now()){
+ const r=bookingIdentity(input,false),type=String(input.consultationType||''),date=bookingDate(input.date),start=String(input.start||'');
+ const slot=consultationSlots(type,date,catalog,now).find(s=>s.start===start);if(!slot)throw Error('상담 가능한 시간이 아니거나 이미 예약되었습니다. 날짜와 시간을 다시 선택해 주세요.');
+ return {...r,consultationType:type,date,...slot};
+}
