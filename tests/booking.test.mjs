@@ -43,3 +43,15 @@ test('admin confirms final makeup seat without counting itself; other reservatio
  assert.equal(writes,0);assert.equal(rows[0].status,'접수');
  rows[1].status='취소';assert.doesNotThrow(()=>vm.runInContext("updateBookingStatus('absence','test-request-00000001','확정','','',true)",ctx));
 });
+
+test('two seminar sessions persist independently in the private registration table',()=>{
+ const ctx=vm.createContext({BOOKING_VERSION,validateSeminar,bookingIdentity:i=>({...identity,...i}),now_:()=>new Date(now).toISOString(),SpreadsheetApp:{flush(){}}});
+ vm.runInContext(fs.readFileSync('apps-script/Booking.gs','utf8'),ctx);
+ const events=[{...event,id:'session-a'},{...event,id:'session-b',date:'2026-11-19'}],rows=[];
+ ctx.ensureBookings_=()=>{};ctx.bookingRead_=n=>n==='설명회'?events:n==='설명회신청'?rows:[];ctx.append_=(table,row)=>{assert.equal(table,'설명회신청');rows.push(row);};
+ const first={...identity,kind:'seminar',eventId:'session-a',mode:'online'},second={...first,eventId:'session-b',requestId:'test-request-00000002'};
+ ctx.submitBooking_(first);ctx.submitBooking_(second);ctx.submitBooking_(second);
+ assert.equal(rows.length,2);assert.deepEqual(rows.map(r=>r.eventId),['session-a','session-b']);assert.ok(rows.every(r=>r.parent===identity.parent&&r.phone===identity.phone&&r.student===identity.student&&r.school===identity.school&&r.status==='예약'));
+});
+
+test('seminar attendance restrictions reject forged modes while preserving legacy both',()=>{for(const attendanceMode of ['onsite','online']){const current={...event,attendanceMode};assert.doesNotThrow(()=>validateSeminar({...identity,mode:attendanceMode},current,[],now));assert.throws(()=>validateSeminar({...identity,mode:attendanceMode==='onsite'?'online':'onsite'},current,[],now),/방식/);}assert.doesNotThrow(()=>validateSeminar({...identity,mode:'online'},event,[],now));assert.throws(()=>validateSeminar({...identity,mode:'online'},{...event,attendanceMode:'invalid'},[],now),/방식/);});
