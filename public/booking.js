@@ -13,6 +13,7 @@ const scopeTitle={seminar:'설명회 신청',visit:'방문 상담 예약',absenc
 const cancelTitle={seminar:'설명회 신청 취소',visit:'방문 상담 예약 취소',absence:'결석·보강 예약 취소',consultation:'상담 예약 취소'}[scope];
 $('#seminar-navigation').hidden=scope!=='seminar';
 $('#page-heading').textContent=kind==='cancel'?cancelTitle:scopeTitle;
+$('#note-label').textContent=kind==='seminar'?'간단히 자녀의 과학 공부에 대한 고민을 들려주세요. 고민들을 모아 실질적인 도움이 되도록 하겠습니다.':'상담 참고 내용 (선택)';
 document.title=(kind==='cancel'?cancelTitle:scopeTitle)+' | 올타과학';
 $('#cancel-link').href='./booking.html?kind=cancel&bookingKind='+scope;
 $('#cancel-link').textContent=cancelTitle;
