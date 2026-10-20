@@ -1,3 +1,4 @@
+import {readPublicData} from './public-data.js?v=20261020-anonymous';
 import {GRADES,COURSE_GRADES,courseGrade,gradeLabel,studentGrades,curriculum,classCapacity,normalizePhone,makeupWindow,validateMakeup,openingSlotAvailable} from './domain.js?v=20261016-capacity10';
 import {submitInline} from './submission.js?v=20261020-receipt';
 import {demoCatalog} from './demo.js';
@@ -10,10 +11,10 @@ const mobileState={grade:'초1',day:'',page:0};
 const mobileMedia=window.matchMedia('(max-width: 700px)');
 const validUrl=url=>/^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/.test(url);
 function connection(text,type=''){const el=$('#connection');el.className='connection '+type;el.textContent=text;}
-function jsonp(url){return new Promise((resolve,reject)=>{const callback='olta_'+crypto.randomUUID().replaceAll('-','');const script=document.createElement('script');const cleanup=()=>{clearTimeout(timer);delete window[callback];script.remove();};const timer=setTimeout(()=>{cleanup();reject(new Error('시간표 서버 응답이 늦습니다. 잠시 후 다시 시도해 주세요.'));},20000);window[callback]=data=>{cleanup();data.error?reject(new Error(data.error)):resolve(data);};script.onerror=()=>{cleanup();reject(new Error('시간표 서버에 연결할 수 없습니다.'));};script.src=url+'?action=catalog&callback='+callback;document.head.append(script);});}
+function readCatalog(url){return readPublicData(url,{action:'catalog'},{service:'시간표 서버',timeoutMs:20000});}
 async function load(){state.loading=true;connection('시간표를 확인하고 있습니다.');try{
   if(!config.apiUrl){state.catalog=demoCatalog();connection('미리보기 · 아래 수업·인원은 예시입니다. 실제 상담 신청은 아직 받지 않습니다.');}
-  else{if(!validUrl(config.apiUrl))throw new Error('운영 서버 주소 설정을 확인해 주세요.');state.catalog=await jsonp(config.apiUrl);if(!Array.isArray(state.catalog.classes)||!Array.isArray(state.catalog.slots))throw new Error('시간표 데이터 형식을 확인해 주세요.');connection('실시간 접수 연결 · 상담 신청 후 시간표 등록을 확인하여 확정합니다.','live');}
+  else{if(!validUrl(config.apiUrl))throw new Error('운영 서버 주소 설정을 확인해 주세요.');state.catalog=await readCatalog(config.apiUrl);if(!Array.isArray(state.catalog.classes)||!Array.isArray(state.catalog.slots))throw new Error('시간표 데이터 형식을 확인해 주세요.');connection('실시간 접수 연결 · 상담 신청 후 시간표 등록을 확인하여 확정합니다.','live');}
   $('#updated').textContent=state.catalog.updatedAt?'시간표 확인 '+new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(state.catalog.updatedAt)):'예시 화면 · 실제 시간표 미연결';
   renderPrivacy();
 }catch(error){state.catalog={classes:[],slots:[],demand:{},mode:'error'};connection(error.message+' 신청은 일시 중지됩니다.','error');const retry=document.createElement('button');retry.textContent='다시 확인';retry.onclick=load;$('#connection').append(retry);}finally{state.loading=false;render();}}

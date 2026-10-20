@@ -1,12 +1,13 @@
+import {readPublicData} from './public-data.js?v=20261020-anonymous';
 import {REVIEW_VERSION,validateReview} from './review-domain.js';
 const $=s=>document.querySelector(s),form=$('#review-form'),config=window.OLTA_CONFIG||{};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const params=new URLSearchParams(location.search);let link=null,catalog=null;
 try{link=JSON.parse(decodeURIComponent(location.hash.slice(1)));if(link?.registrationId&&link?.registrationToken)history.replaceState(null,'',location.pathname+'?eventId='+encodeURIComponent(link.eventId||''));else link=null;}catch{}
-function jsonp(){return new Promise((resolve,reject)=>{const name='olta_'+crypto.randomUUID().replaceAll('-',''),script=document.createElement('script');let timer;const cleanup=()=>{clearTimeout(timer);script.remove();delete window[name];};window[name]=r=>{cleanup();r.error?reject(Error(r.error)):resolve(r);};timer=setTimeout(()=>{cleanup();reject(Error('후기 서버 응답이 늦습니다. 다시 연결해 주세요.'));},45000);script.onerror=()=>{cleanup();reject(Error('후기 서버에 연결할 수 없습니다.'));};script.src=config.apiUrl+'?action=reviews&callback='+name;document.head.append(script);});}
+function readCatalog(){return readPublicData(config.apiUrl,{action:'reviews'},{service:'후기 서버',timeoutMs:45000});}
 async function load(){document.getElementById('linked-event')?.remove();$('#review-event').disabled=false;form.hidden=true;$('#retry').hidden=true;$('#connection').textContent='설명회 정보를 확인하고 있습니다.';try{
  if(!config.apiUrl)catalog={mode:'demo',reviewEnabled:true,events:[{id:'sample',title:'학부모 설명회 · 미리보기',date:'2026-10-15',start:'10:00',open:true}],retentionDays:90,privacyContact:'010-5725-6442'};
- else{if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(config.apiUrl))throw Error('운영 서버 주소를 확인해 주세요.');catalog=await jsonp();if(!catalog.reviewEnabled)throw Error('후기 기능을 준비 중입니다. 잠시 후 다시 접속해 주세요.');}
+ else{if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(config.apiUrl))throw Error('운영 서버 주소를 확인해 주세요.');catalog=await readCatalog();if(!catalog.reviewEnabled)throw Error('후기 기능을 준비 중입니다. 잠시 후 다시 접속해 주세요.');}
  const events=catalog.events.filter(e=>e.open),selected=link?.eventId||params.get('eventId');$('#review-event').innerHTML='<option value="">'+(events.length?'설명회를 선택해 주세요':'후기 작성 가능한 설명회가 없습니다')+'</option>'+events.map(e=>`<option value="${esc(e.id)}">${esc(e.title+' · '+e.date)}</option>`).join('');if(events.some(e=>e.id===selected))$('#review-event').value=selected;
  form.elements.requestId.value=crypto.randomUUID();form.elements.privacyVersion.value=REVIEW_VERSION;
  if(link){form.elements.registrationId.value=link.registrationId;form.elements.registrationToken.value=link.registrationToken;$('#identity-fields').hidden=true;$('#identity-fields').disabled=true;$('#linked-note').hidden=false;$('#review-event').disabled=true;const hidden=document.createElement('input');hidden.type='hidden';hidden.id='linked-event';hidden.name='eventId';hidden.value=link.eventId;form.append(hidden);}
