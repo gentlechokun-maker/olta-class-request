@@ -9,7 +9,38 @@ const BOOKING_TABLES_={
 function setupBookings(){admin_();return locked_(()=>{ensureBookings_();const rows=bookingRead_('수업주차'),keys=new Set(rows.map(r=>r.date+'|'+r.grade));const added=CALENDAR_2026_.filter(r=>!keys.has(r.date+'|'+r.grade));write_('수업주차',rows.concat(added));audit_('예약 기능 설정',String(added.length));return '예약 운영 표와 2026 수업주차 '+added.length+'일이 추가되었습니다. 기존 입력은 유지했습니다.';});}
 function cleanupBookings_(cutoff){if(typeof cleanupReviews_==='function')cleanupReviews_(cutoff);Object.assign(TABLES_,BOOKING_TABLES_);for(const name of ['설명회신청','방문상담','결석보강','상담예약'])if(db_().getSheetByName(name))write_(name,bookingRead_(name).filter(r=>Math.max(Date.parse(r.createdAt)||0,Date.parse((r.date||r.absenceDate)+'T23:59:59+09:00')||0)>=cutoff));}
 function ensureBookings_(){Object.assign(TABLES_,BOOKING_TABLES_);const db=db_();for(const [name,headers] of Object.entries(BOOKING_TABLES_)){let s=db.getSheetByName(name);if(!s)s=db.insertSheet(name);if(!s.getLastRow()){s.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e5eddc');s.setFrozenRows(1);}else if(name==='설명회'){const old=s.getRange(1,1,1,s.getLastColumn()).getDisplayValues()[0];if(old.length===headers.length-1&&old.every((v,i)=>v===headers[i]))s.getRange(1,headers.length).setValue('attendanceMode').setFontWeight('bold');}}}
-function bookingRead_(name){Object.assign(TABLES_,BOOKING_TABLES_);return db_().getSheetByName(name)?read_(name):[];}
+function bookingRead_(name){Object.assign(TABLES_,BOOKING_TABLES_);return read_(name,true);}
+function publicSeminars_(){
+ const registrations=bookingRead_('설명회신청');
+ return bookingRead_('설명회').filter(e=>enabled_(e.enabled)).map(e=>({id:e.id,title:e.title,date:e.date,start:e.start,location:e.location,onlineInfo:e.onlineInfo,enabled:'true',attendanceMode:e.attendanceMode||'both',remaining:Math.max(0,20-registrations.filter(r=>r.eventId===e.id&&r.mode==='onsite'&&r.status!=='취소').length)}));
+}
+function publicBookingWeeks_(){return bookingRead_('수업주차').map(w=>({date:w.date,grade:w.grade,weekId:w.weekId}));}
+function cachedBookingWeeks_(){
+ let cache;try{cache=CacheService.getScriptCache();const raw=cache.get('public-booking-weeks-v1');if(raw)return JSON.parse(raw);}catch(error){/* Read the sheet on a cache miss. */}
+ const weeks=publicBookingWeeks_();if(cache)try{cache.put('public-booking-weeks-v1',JSON.stringify(weeks),21600);}catch(error){/* Cache is optional. */}return weeks;
+}
+function publicMakeupSeats_(excludeMakeupId){return bookingRead_('결석보강').filter(r=>r.id!==excludeMakeupId&&r.choice==='same'&&r.status!=='취소').reduce((a,r)=>{const key=r.makeupClassId+'|'+r.date;a[key]=(a[key]||0)+1;return a;},{});}
+// Each public page receives only the data needed by that kind of booking.
+function bookingPageCatalog_(scope,excludeMakeupId,display){
+ if(scope==='all')return bookingCatalog_(excludeMakeupId);
+ const p=props_(),meta={bookingEnabled:true,mode:'live',retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT')||'010-5725-6442',classes:[]};
+ if(scope==='cancel')return meta;
+ if(scope==='seminar')return {...meta,seminars:publicSeminars_()};
+ const schedule=publicSchedule_();
+ if(scope==='consultation')return {...schedule,bookingEnabled:true,...consultationCatalog_(schedule)};
+ if(scope==='absence')return {...schedule,bookingEnabled:true,weeks:display?cachedBookingWeeks_():publicBookingWeeks_(),makeupSeats:publicMakeupSeats_(excludeMakeupId)};
+ if(scope==='visit')return {...schedule,bookingEnabled:true,visits:bookingRead_('방문상담').filter(r=>r.status!=='취소').map(r=>({date:r.date,start:r.start,end:r.end,category:r.category,status:'예약'}))};
+ throw Error('예약 조회 종류를 확인해 주세요.');
+}
+// Only redacted display results use this cache. POST and admin approval bypass it.
+function cachedBookingPage_(requestedScope){
+ const scope=requestedScope||'all';if(!['all','seminar','consultation','absence','visit','cancel'].includes(scope))throw Error('예약 조회 종류를 확인해 주세요.');
+ const key='public-booking-v3:'+scope;let cache;
+ const hit=()=>{try{if(!cache)return null;const raw=cache.get(key);if(!raw)return null;const entry=JSON.parse(raw);if(entry.expiresAt>Date.now()&&entry.data&&(!entry.data.updatedAt||!catalogStale_(entry.data.updatedAt)))return entry.data;}catch(error){/* Cache is optional. */}return null;};
+ try{cache=CacheService.getScriptCache();}catch(error){/* Read validated data if unavailable. */}
+ const found=hit();if(found)return found;
+ return locked_(()=>{const found=hit();if(found)return found;const value=bookingPageCatalog_(scope,undefined,true);if(cache&&(!value.updatedAt||!catalogStale_(value.updatedAt)))try{cache.put(key,JSON.stringify({expiresAt:Date.now()+60000,data:value}),60);}catch(error){/* Oversized values or cache failure must not block booking. */}return value;});
+}
 function bookingCatalog_(excludeMakeupId){const catalog=publicCatalog_(),seminars=bookingRead_('설명회'),registrations=bookingRead_('설명회신청');return {...catalog,...consultationCatalog_(catalog),bookingEnabled:true,weeks:bookingRead_('수업주차').map(w=>({date:w.date,grade:w.grade,weekId:w.weekId})),seminars:seminars.filter(e=>enabled_(e.enabled)).map(e=>({id:e.id,title:e.title,date:e.date,start:e.start,location:e.location,onlineInfo:e.onlineInfo,enabled:'true',attendanceMode:e.attendanceMode||'both',remaining:Math.max(0,20-registrations.filter(r=>r.eventId===e.id&&r.mode==='onsite'&&r.status!=='취소').length)})),visits:bookingRead_('방문상담').filter(r=>r.status!=='취소').map(r=>({date:r.date,start:r.start,end:r.end,category:r.category,status:'예약'})),makeupSeats:bookingRead_('결석보강').filter(r=>r.id!==excludeMakeupId&&r.choice==='same'&&r.status!=='취소').reduce((a,r)=>{const key=r.makeupClassId+'|'+r.date;a[key]=(a[key]||0)+1;return a;},{})};}
 function bookingTable_(kind){const name={seminar:'설명회신청',visit:'방문상담',absence:'결석보강',consultation:'상담예약'}[kind];if(!name)throw Error('신청 종류를 확인해 주세요.');return name;}
 function linkVisitRequest_(r){if(read_('신청').some(x=>x.id===r.id))return;append_('신청',{id:r.id,createdAt:r.createdAt,kind:'existing',targetId:r.targetId,student:r.student,grade:r.grade,phone:r.phone,note:'방문 상담 '+r.date+' '+r.start+'–'+r.end+' / '+r.note,status:'접수',consentVersion:BOOKING_VERSION,consentAt:r.consentAt});}

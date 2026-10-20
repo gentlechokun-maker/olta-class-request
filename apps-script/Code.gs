@@ -27,15 +27,26 @@ function setup(){
   SpreadsheetApp.getUi().alert('비공개 운영 시트가 준비되었습니다. 프로젝트 설정의 스크립트 속성과 반설정·빈시간을 입력한 뒤 시간표를 동기화하세요.');
 }
 function openAdmin(){admin_();SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutputFromFile('Admin').setWidth(1180).setHeight(760),'올타과학 · 상담과 운영');}
-function read_(name){const sheet=db_().getSheetByName(name);if(!sheet)throw new Error('운영 시트를 초기화하세요.');const values=sheet.getDataRange().getDisplayValues(),headers=values.shift();return values.filter(row=>row.some(Boolean)).map(row=>Object.fromEntries(headers.map((key,i)=>[key,row[i]||''])));}
+// Private rows are reused only within one execution, never in the shared display cache.
+let READ_CACHE_=Object.create(null),SEMESTER_VALUE_=null,WRITE_DIRTY_=false;
+function clearReadCache_(){READ_CACHE_=Object.create(null);SEMESTER_VALUE_=null;}
+function read_(name,optional){
+  if(!Object.prototype.hasOwnProperty.call(READ_CACHE_,name)){
+    const sheet=db_().getSheetByName(name);if(!sheet){if(optional)return [];throw new Error('운영 시트를 초기화하세요.');}
+    const values=sheet.getDataRange().getDisplayValues(),headers=values.shift();
+    READ_CACHE_[name]=values.filter(row=>row.some(Boolean)).map(row=>Object.fromEntries(headers.map((key,i)=>[key,row[i]||''])));
+  }
+  // Callers edit rows before writing; do not let those edits mutate the read snapshot.
+  return READ_CACHE_[name].map(row=>({...row}));
+}
 function safeCell_(value){const s=String(value??'');return /^[=+@\-]/.test(s)?"'"+s:s;}
-function write_(name,rows){invalidateCatalogCache_();const sheet=db_().getSheetByName(name),headers=TABLES_[name];if(sheet.getLastRow()>1)sheet.getRange(2,1,sheet.getLastRow()-1,headers.length).clearContent();if(rows.length){if(sheet.getMaxRows()<rows.length+1)sheet.insertRowsAfter(sheet.getMaxRows(),rows.length+1-sheet.getMaxRows());sheet.getRange(2,1,rows.length,headers.length).setNumberFormat('@').setValues(rows.map(r=>headers.map(k=>safeCell_(r[k]))));}}
-function append_(name,row){invalidateCatalogCache_();const sheet=db_().getSheetByName(name),headers=TABLES_[name];const n=sheet.getLastRow()+1;if(n>sheet.getMaxRows())sheet.insertRowAfter(sheet.getMaxRows());sheet.getRange(n,1,1,headers.length).setNumberFormat('@').setValues([headers.map(k=>safeCell_(row[k]))]);}
-function locked_(fn){const lock=LockService.getScriptLock();if(!lock.tryLock(20000))throw new Error('다른 신청을 처리하고 있습니다. 잠시 후 다시 시도해 주세요.');try{return fn();}finally{lock.releaseLock();}}
+function write_(name,rows){WRITE_DIRTY_=true;delete READ_CACHE_[name];invalidateCatalogCache_(name);const sheet=db_().getSheetByName(name),headers=TABLES_[name];if(sheet.getLastRow()>1)sheet.getRange(2,1,sheet.getLastRow()-1,headers.length).clearContent();if(rows.length){if(sheet.getMaxRows()<rows.length+1)sheet.insertRowsAfter(sheet.getMaxRows(),rows.length+1-sheet.getMaxRows());sheet.getRange(2,1,rows.length,headers.length).setNumberFormat('@').setValues(rows.map(r=>headers.map(k=>safeCell_(r[k]))));}}
+function append_(name,row){WRITE_DIRTY_=true;delete READ_CACHE_[name];invalidateCatalogCache_(name);const sheet=db_().getSheetByName(name),headers=TABLES_[name];const n=sheet.getLastRow()+1;if(n>sheet.getMaxRows())sheet.insertRowAfter(sheet.getMaxRows());sheet.getRange(n,1,1,headers.length).setNumberFormat('@').setValues([headers.map(k=>safeCell_(row[k]))]);}
+function locked_(fn){const lock=LockService.getScriptLock();if(!lock.tryLock(20000))throw new Error('다른 신청을 처리하고 있습니다. 잠시 후 다시 시도해 주세요.');clearReadCache_();WRITE_DIRTY_=false;try{return fn();}finally{try{if(WRITE_DIRTY_)SpreadsheetApp.flush();}finally{WRITE_DIRTY_=false;clearReadCache_();lock.releaseLock();}}}
 function now_(){return new Date().toISOString();}
 function today_(){return Utilities.formatDate(new Date(),'Asia/Seoul','yyyy-MM-dd');}
 function enabled_(v){return /^(true|1|yes|사용)$/i.test(String(v).trim());}
-function semester_(){return props_().getProperty('SEMESTER')==='1'?1:2;}
+function semester_(){if(SEMESTER_VALUE_===null)SEMESTER_VALUE_=props_().getProperty('SEMESTER')==='1'?1:2;return SEMESTER_VALUE_;}
 function classes_(){return read_('반설정').filter(c=>enabled_(c.enabled)).map(c=>{const profile=classCurriculum(c,semester_());return {...c,title:profile?profile.name:c.title,capacity:classCapacity(c),lesson:profile?profile.lesson:''};});}
 function audit_(action,id){append_('감사',{time:now_(),actor:Session.getActiveUser().getEmail()||'public',action,recordId:id});}
 function configIssues_(rows){
@@ -80,16 +91,22 @@ function syncTimetable_(){
   props_().setProperty('LAST_SYNC',timestamp);reconcileRequests_(roster,summaries);SpreadsheetApp.flush();return {classes:classes.length,review:summaries.filter(s=>s.review==='true').length,updatedAt:timestamp};
 }
 function reconcileRequests_(roster,summaries){const requests=read_('신청');let changed=false;for(const r of requests){if(!r.confirmedClassId||!r.confirmedName||r.status==='취소')continue;const matches=roster.filter(p=>p.classId===r.confirmedClassId&&p.name===r.confirmedName),summary=summaries.find(s=>s.classId===r.confirmedClassId);const p=matches.length===1?matches[0]:null;const next=summary&&summary.review!=='true'&&p&&['registered','starting'].includes(p.status)?STATUS[p.status]:'시간표 재확인';if(r.status!==next){r.status=next;changed=true;}}if(changed)write_('신청',requests);}
-function publicCatalog_(){
+function publicSchedule_(){
   const p=props_(),last=p.getProperty('LAST_SYNC');if(!last||!p.getProperty('PRIVACY_CONTACT'))throw new Error('운영자가 시간표와 상담 연락처를 준비 중입니다.');
   const stale=catalogStale_(last),classes=classes_(),summaries=read_('동기화'),configuration=configIssues_(classes);
   const visible=classes.filter(c=>COURSE_GRADES.includes(courseGrade(c.grade))).map(c=>{const s=summaries.find(s=>s.classId===c.id),counts=s?capacity(s,classCapacity(c)):{used:0,remaining:0,over:false};return {id:c.id,grade:courseGrade(c.grade),title:c.title,lesson:classCurriculum(c,semester_())?.lesson||'',day:c.day,start:c.start,end:c.end,room:c.room,teacher:c.teacher,teacherColor:/^#[a-f0-9]{6}$/i.test(c.teacherColor)?c.teacherColor:'#e6ecd9',capacity:classCapacity(c),used:counts.used,remaining:counts.remaining,review:stale||!s||counts.over||!Number.isFinite(counts.used)||counts.used<0||s.configKey!==classKey_(c)||s.review==='true'||configuration[c.id].length>0};});
-  const slots=generateOpeningSlots(classes,semester_());
-  const requests=read_('신청');return {makeupEnabled:true,mode:'live',semester:semester_(),updatedAt:last,classes:visible,slots:stale?[]:slots,demand:aggregateDemand(requests),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT')};
+  return {makeupEnabled:true,mode:'live',semester:semester_(),updatedAt:last,classes:visible,retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT')};
+}
+function publicCatalog_(){
+  const schedule=publicSchedule_(),slots=generateOpeningSlots(classes_(),semester_());
+  return {...schedule,slots:catalogStale_(schedule.updatedAt)?[]:slots,demand:aggregateDemand(read_('신청'))};
 }
 // Anonymous display cache only. Submissions always validate uncached operations data.
 function catalogStale_(last){const time=Date.parse(last);return !Number.isFinite(time)||time>Date.now()||Date.now()-time>400*60000;}
-function invalidateCatalogCache_(){try{CacheService.getScriptCache().remove('public-catalog-v2');}catch(error){/* Cache is optional. */}}
+function invalidateCatalogCache_(name){
+  if(name==='감사'||name==='휴원연락')return;
+  try{const cache=CacheService.getScriptCache();const keys=['public-catalog-v2',...['all','seminar','consultation','absence','visit','cancel'].map(scope=>'public-booking-v3:'+scope)];if(!name||name==='수업주차')keys.push('public-booking-weeks-v1');for(const key of keys)cache.remove(key);}catch(error){/* Cache is optional. */}
+}
 function cachedPublicCatalog_(){
   let cache;try{cache=CacheService.getScriptCache();const raw=cache.get('public-catalog-v2');if(raw){const value=JSON.parse(raw);if(!catalogStale_(value.updatedAt))return value;}}catch(error){/* Fall back to validated data. */}
   return locked_(()=>{const value=publicCatalog_();if(cache&&!catalogStale_(value.updatedAt)){try{cache.put('public-catalog-v2',JSON.stringify(value),300);}catch(error){/* Cache failure must not block reads. */}}return value;});
@@ -97,7 +114,7 @@ function cachedPublicCatalog_(){
 function doGet(e){
   if(e&&e.parameter&&['admin','legacyAdmin'].includes(e.parameter.action))return bookingAdminPage_(e.parameter.action);
   const callback=String(e&&e.parameter&&e.parameter.callback||'');if(callback&&!/^olta_[a-f0-9]{32}$/.test(callback))return ContentService.createTextOutput('{"error":"Invalid callback"}').setMimeType(ContentService.MimeType.JSON);
-  let result;try{result=e&&e.parameter&&e.parameter.action==='reviews'?locked_(()=>publicReviewCatalog_()):e&&e.parameter&&e.parameter.action==='bookings'?locked_(()=>bookingCatalog_()):cachedPublicCatalog_();}catch(error){console.error('Catalog read failed: '+error.message);result={error:'시간표를 준비 중이거나 연결을 확인 중입니다. 잠시 후 다시 시도해 주세요.'};}
+  let result;try{result=e&&e.parameter&&e.parameter.action==='reviews'?locked_(()=>publicReviewCatalog_()):e&&e.parameter&&e.parameter.action==='bookings'?cachedBookingPage_(e.parameter.scope):cachedPublicCatalog_();}catch(error){console.error('Catalog read failed: '+error.message);result={error:'시간표를 준비 중이거나 연결을 확인 중입니다. 잠시 후 다시 시도해 주세요.'};}
   const json=JSON.stringify(result).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');return ContentService.createTextOutput(callback?callback+'('+json+');':json).setMimeType(callback?ContentService.MimeType.JAVASCRIPT:ContentService.MimeType.JSON);
 }
 function doPost(e){let result;try{result=locked_(()=>{const input=e&&e.parameter||{};return input.kind==='seminar_review'?submitReview_(input):['seminar','visit','absence','consultation','booking_cancel'].includes(input.kind)?submitBooking_(input):input.kind==='makeup'?submitMakeup_(input):submit_(input);});}catch(error){result={ok:false,message:error.message};}if(e&&e.parameter&&e.parameter._responseMode==='inline'&&['existing','new'].includes(e.parameter.kind))return inlineReceipt_(result,e.parameter);return e&&e.parameter&&e.parameter.kind==='seminar_review'?reviewReceipt_(result):e&&e.parameter&&['seminar','visit','absence','consultation','booking_cancel'].includes(e.parameter.kind)?bookingReceipt_(result):receipt_(result);}
