@@ -100,7 +100,7 @@ function doGet(e){
   let result;try{result=e&&e.parameter&&e.parameter.action==='reviews'?locked_(()=>publicReviewCatalog_()):e&&e.parameter&&e.parameter.action==='bookings'?locked_(()=>bookingCatalog_()):cachedPublicCatalog_();}catch(error){console.error('Catalog read failed: '+error.message);result={error:'시간표를 준비 중이거나 연결을 확인 중입니다. 잠시 후 다시 시도해 주세요.'};}
   const json=JSON.stringify(result).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');return ContentService.createTextOutput(callback?callback+'('+json+');':json).setMimeType(callback?ContentService.MimeType.JAVASCRIPT:ContentService.MimeType.JSON);
 }
-function doPost(e){let result;try{result=locked_(()=>{const input=e&&e.parameter||{};return input.kind==='seminar_review'?submitReview_(input):['seminar','visit','absence','consultation','booking_cancel'].includes(input.kind)?submitBooking_(input):input.kind==='makeup'?submitMakeup_(input):submit_(input);});}catch(error){result={ok:false,message:error.message};}return e&&e.parameter&&e.parameter.kind==='seminar_review'?reviewReceipt_(result):e&&e.parameter&&['seminar','visit','absence','consultation','booking_cancel'].includes(e.parameter.kind)?bookingReceipt_(result):receipt_(result);}
+function doPost(e){let result;try{result=locked_(()=>{const input=e&&e.parameter||{};return input.kind==='seminar_review'?submitReview_(input):['seminar','visit','absence','consultation','booking_cancel'].includes(input.kind)?submitBooking_(input):input.kind==='makeup'?submitMakeup_(input):submit_(input);});}catch(error){result={ok:false,message:error.message};}if(e&&e.parameter&&e.parameter._responseMode==='inline'&&['existing','new'].includes(e.parameter.kind))return inlineReceipt_(result,e.parameter);return e&&e.parameter&&e.parameter.kind==='seminar_review'?reviewReceipt_(result):e&&e.parameter&&['seminar','visit','absence','consultation','booking_cancel'].includes(e.parameter.kind)?bookingReceipt_(result):receipt_(result);}
 function submit_(input){
   const catalog=publicCatalog_(),r=validateRequest(input,catalog),rows=read_('신청');
   const sameId=rows.find(x=>x.id===r.requestId);if(sameId){if(sameId.student!==r.student||sameId.phone!==r.phone||sameId.targetId!==r.targetId||sameId.grade!==r.grade||sameId.kind!==r.kind)throw new Error('신청 식별자가 일치하지 않습니다. 화면을 다시 열어 주세요.');return {ok:true,id:sameId.id,duplicate:true};}
@@ -169,3 +169,10 @@ function cleanup_(){return locked_(()=>{const days=Number(props_().getProperty('
 
 
 
+
+function inlineReceipt_(result,input){
+ const site=String(props_().getProperty('SITE_URL')||''),origin=(/^(https:\/\/[a-zA-Z0-9.-]+)(?:\/|$)/.exec(site)||[])[1],nonce=String(input._responseNonce||'');
+ if(!origin||input._responseOrigin!==origin||!/^[a-f0-9]{32}$/.test(nonce))return receipt_(result);
+ const payload=JSON.stringify({type:'olta-request-receipt',nonce,result:{ok:result.ok===true,id:result.id||'',duplicate:result.duplicate===true,message:result.message||''}}).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+ return HtmlService.createHtmlOutput('<!doctype html><html lang="ko"><head><meta name="referrer" content="no-referrer"></head><body><p>'+escape_(result.ok?'신청이 완료되었습니다.':'신청을 완료하지 못했습니다. '+(result.message||''))+'</p><script>window.top.postMessage('+payload+','+JSON.stringify(origin)+');</script></body></html>').setTitle('올타과학 · 접수 결과').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
