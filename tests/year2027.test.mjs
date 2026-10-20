@@ -33,7 +33,10 @@ test('2027 public endpoint reads no private roster and emits only approved class
   r.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
   const catalog=JSON.parse(r.doGet({parameter:{action:'year2027'}}).text);
   assert.equal(catalog.year,2027);
-  for(const c of catalog.classes)assert.deepEqual(Object.keys(c).sort(),['day','end','grade','id','room','start','teacher','title']);
+  for(const c of catalog.classes){
+    assert.deepEqual(Object.keys(c).sort(),['capacity','day','end','grade','id','room','start','teacher','title']);
+    assert.equal(c.capacity,/^[중고]/.test(c.grade)?12:6);
+  }
 });
 test('2027 validation rejects mismatched grades, current classes, incomplete courses and missing consent',()=>{
   const r=runtime();assert.equal(r.validate2027_(input).phone,'01012345678');
