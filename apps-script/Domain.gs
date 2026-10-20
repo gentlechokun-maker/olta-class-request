@@ -23,8 +23,8 @@ const PALETTE = {
 };
 function normalizePhone(value){ return String(value||'').replace(/[^0-9]/g,'').replace(/^82(10)/,'0$1'); }
 function normalizeName(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ');}
-function classCapacity(c){return c.grade!=='초6'&&(c.lessonType==='theory'||['중1','중2','중3','고1'].includes(c.grade))?10:6;}
-function makeupCapacity(type,grade){return type==='theory'&&grade!=='초6'?10:6;}
+function classCapacity(c){return c.grade!=='초6'&&(c.lessonType==='theory'||['중1','중2','중3','고1','고2','고3'].includes(c.grade))?12:6;}
+function makeupCapacity(type,grade){return type==='theory'&&grade!=='초6'?12:6;}
 function capacity(counts,limit=6){const used=Number(counts.registered||0)+Number(counts.starting||0);return {used,remaining:Math.max(0,limit-used),over:used>limit};}
 function parseColoredCell(text,runs,palette=PALETTE){
   const people=[],issues=[];
