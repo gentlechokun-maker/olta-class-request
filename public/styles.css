@@ -29,3 +29,16 @@
 .booking-shortcuts{grid-template-columns:repeat(4,1fr)}@media(max-width:700px){.site-header nav>a.consultation-link{display:inline-block;white-space:nowrap}.site-header .brand-logo{width:145px}}
 
 .request-result{padding:24px 20px;margin:20px 0;background:#e8f5ed;border:1px solid #8fbc9f;border-radius:12px;color:#174a31}.request-result h3{font-size:23px;margin:0 0 12px}.request-result p{font-size:14px;line-height:1.8}.request-result small{display:block;overflow-wrap:anywhere;color:#32604b}
+
+
+/* The 2027 panel has the same filters and cards at every screen size. */
+[hidden]{display:none!important}
+.upcoming-filters{display:flex;gap:16px;flex-wrap:wrap;margin:24px 0 14px}
+.upcoming-filters label{display:grid;gap:7px;font-weight:600;font-size:14px;min-width:150px}
+.upcoming-filters select{padding:12px;border:1px solid #cdddea;border-radius:8px;background:white;color:#17364e;font:inherit}
+.upcoming-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin:18px 0}
+.upcoming-card{background:white;border:1px solid #d8e4ef;border-radius:14px;padding:22px}
+.upcoming-card h3{font-size:19px;margin:14px 0 8px}
+.upcoming-card p{font-size:14px}.upcoming-card .card-button{width:100%;margin-top:14px}
+.tabs{overflow-x:auto}.tabs [role=tab]{flex-shrink:0}
+@media(max-width:700px){.upcoming-grid{grid-template-columns:1fr}.upcoming-filters label{flex:1;min-width:120px}.tabs [role=tab]{font-size:13px}}

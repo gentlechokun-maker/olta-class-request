@@ -2,7 +2,7 @@
 // Administrator pages and all booking writes keep their existing authorization.
 export async function readPublicData(apiUrl,query,{service='서버',timeoutMs=20000,fetchImpl=fetch}={}){
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(apiUrl))throw Error('운영 서버 주소를 확인해 주세요.');
- if(!['catalog','bookings','reviews'].includes(query.action)||Object.keys(query).some(k=>!['action','scope'].includes(k)))throw Error('공개 조회 종류를 확인해 주세요.');
+ if(!['catalog','bookings','reviews','year2027'].includes(query.action)||Object.keys(query).some(k=>!['action','scope'].includes(k)))throw Error('공개 조회 종류를 확인해 주세요.');
  const url=new URL(apiUrl);for(const [key,value] of Object.entries(query))url.searchParams.set(key,value);
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
