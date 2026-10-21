@@ -46,7 +46,7 @@ function openRequest(kind,id){
   const form=$('#request-form');if(form.dataset.sending==='true'){if(!$('#request-dialog').open)$('#request-dialog').showModal();return;}form.hidden=false;$('#request-result').hidden=true;form.reset();form.elements.kind.value=kind;form.elements.targetId.value=id;form.elements.scheduleKey.value=kind==='year2027'?JSON.stringify([target.id,target.grade,target.title,target.day,target.start,target.end,target.room]):'';form.elements.requestId.value=crypto.randomUUID();
   const grades=kind==='year2027'?[target.grade]:studentGrades(kind==='new'?target.grades:[target.grade]);form.elements.grade.innerHTML=grades.map(g=>`<option>${esc(g)}</option>`).join('');const selectedGrade=mobileMedia.matches?mobileState.grade:state.grade;if(grades.includes(selectedGrade))form.elements.grade.value=selectedGrade;
   renderPrivacy(catalog);if(kind==='year2027')$('#consent-description').textContent=`수집 항목: 원생 이름·2027년 학년, 보호자 연락처, 상담 참고 내용 / 목적: 2027년 수강 상담 및 연락 / 보관: 접수 후 ${Number(catalog.retentionDays)||90}일. 문의·삭제 요청: ${catalog.privacyContact||'운영자 상담 담당'}`;$('#request-grade-label').textContent=kind==='year2027'?'2027년 기준 학년':'희망 학년';
-  $('#request-title').textContent=kind==='year2027'?'2027년 수업 신청':kind==='makeup'?'결석·보강 예약':kind==='existing'?'이 반 수강 신청':'신규 수업 개설 신청';
+  $('#request-title').textContent=kind==='year2027'?'27년 수업 및 특강 신청':kind==='makeup'?'결석·보강 예약':kind==='existing'?'수강 신청 및 변경':'신규 수업 개설 신청';
   $('#request-summary').textContent=`${kind==='year2027'?'2027년 '+target.grade+' · ':''}${kind==='new'?'':classTitle(target)+' · '}${target.day}요일 ${target.start}–${target.end} · ${target.room}${kind==='year2027'?' · 정원 '+(Number(target.capacity)||classCapacity(target))+'명':''}`;
   $('#makeup-fields').hidden=kind!=='makeup';$('#makeup-fields').disabled=kind!=='makeup';
   form.elements.absenceDate.max=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
@@ -98,7 +98,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-mobile-pag
 async function load2027(force=false){
   if(upcoming.loading)return;if(upcoming.catalog&&!force){render2027();return;}
   upcoming.loading=true;upcoming.error='';render2027();
-  try{if(!validUrl(config.apiUrl))throw new Error('2027년 수업 신청 서버를 준비 중입니다.');
+  try{if(!validUrl(config.apiUrl))throw new Error('27년 수업 및 특강 신청 서버를 준비 중입니다.');
     const c=await readPublicData(config.apiUrl,{action:'year2027'},{service:'2027년 시간표 서버',timeoutMs:20000});
     if(c.year!==2027||!Array.isArray(c.classes))throw new Error('2027년 시간표를 준비 중입니다.');
     upcoming.catalog=c;
@@ -114,7 +114,7 @@ function render2027(){
   const day=$('#year2027-day').value,days=['월','화','수','목','금','토','일'];
   const filtered=classes.filter(c=>(!selected||c.grade===selected)&&(!day||c.day===day)).sort((a,b)=>days.indexOf(a.day)-days.indexOf(b.day)||a.start.localeCompare(b.start)||a.grade.localeCompare(b.grade));
   status.textContent='신청 가능한 2027년 수업 '+filtered.length+'개'+(upcoming.catalog?.updatedAt?' · 확인 '+new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(upcoming.catalog.updatedAt)):'');
-  grid.innerHTML=filtered.map(c=>'<article class="upcoming-card"><span class="grade-label">2027년 '+esc(c.grade)+'</span><h3>'+esc(c.day)+'요일 '+esc(c.start)+'–'+esc(c.end)+'</h3><p>'+esc(c.title)+' · '+esc(c.room)+' · 정원 '+(Number(c.capacity)||classCapacity(c))+'명</p><button class="card-button" data-request="year2027" data-id="'+esc(c.id)+'">2027년 수업 신청 ↗</button></article>').join('')||'<p class="empty">조건에 맞는 수업이 없습니다. 다른 학년·요일을 선택해 주세요.</p>';
+  grid.innerHTML=filtered.map(c=>'<article class="upcoming-card"><span class="grade-label">2027년 '+esc(c.grade)+'</span><h3>'+esc(c.day)+'요일 '+esc(c.start)+'–'+esc(c.end)+'</h3><p>'+esc(c.title)+' · '+esc(c.room)+' · 정원 '+(Number(c.capacity)||classCapacity(c))+'명</p><button class="card-button" data-request="year2027" data-id="'+esc(c.id)+'">27년 수업 및 특강 신청 ↗</button></article>').join('')||'<p class="empty">조건에 맞는 수업이 없습니다. 다른 학년·요일을 선택해 주세요.</p>';
 }
 $('#year2027-grade').onchange=render2027;$('#year2027-day').onchange=render2027;
 if(location.hash==='#year2027'||new URLSearchParams(location.search).get('year')==='2027')selectTab('year2027');
