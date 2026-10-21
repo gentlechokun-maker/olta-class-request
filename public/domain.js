@@ -58,6 +58,7 @@ export function validateRequest(input,catalog){
   if(!target)throw new Error('현재 신청할 수 없는 시간입니다. 새로고침해 주세요.');
   if(kind==='existing'&&(courseGrade(target.grade)!==courseGrade(grade)||target.review||target.remaining<1))throw new Error('현재 상담 신청이 가능한 반인지 다시 확인해 주세요.');
   if(kind==='new'&&!target.grades.map(courseGrade).includes(courseGrade(grade)))throw new Error('이 시간대의 신청 가능 학년을 확인해 주세요.');
+  if(kind==='new'&&catalog.openingYear===2027&&String(input.scheduleKey||'')!==JSON.stringify([target.id,target.day,target.start,target.end,target.room]))throw new Error('개설 가능 시간이 변경되었습니다. 새로고침 후 다시 선택해 주세요.');
   const note=String(input.note||'').trim();if(note.length>300)throw new Error('참고 내용은 300자 이내로 입력해 주세요.');
   return {kind,targetId:target.id,student,phone,grade,note,requestId:String(input.requestId)};
 }
