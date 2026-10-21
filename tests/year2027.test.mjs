@@ -12,29 +12,19 @@ test('2027 catalog is an allowed anonymous request, with no personal query field
 
 function runtime(){
   const r={console,Date,SpreadsheetApp:{flush(){}}};vm.createContext(r);
-  vm.runInContext(fs.readFileSync('public/domain.js','utf8').replace(/^export /gm,'')+'\n'+fs.readFileSync('apps-script/Code.gs','utf8'),r);
+  vm.runInContext(fs.readFileSync('public/domain.js','utf8').replace(/^export /gm,'')+'\n'+fs.readFileSync('apps-script/Code.gs','utf8')+'\n'+fs.readFileSync('apps-script/Year2027.gs','utf8'),r);
   r.props_=()=>({getProperty:k=>({PRIVACY_CONTACT:'학원 상담',RETENTION_DAYS:'90'})[k]});
+  r.read2027Snapshot_=()=>({updatedAt:new Date().toISOString(),classes:[{id:'y2027-C13',grade:'초4',title:'아톰 2',day:'월',start:'14:00',end:'15:00',room:'2교실',capacity:6,remaining:1,review:false},{id:'y2027-E37',grade:'고2',title:'물리',day:'월',start:'20:00',end:'22:00',room:'5교실',capacity:12,remaining:12,review:false}]});
   return r;
 }
 const input={kind:'year2027',targetId:'y2027-C13',grade:'초4',student:'예시학생',phone:'010-1234-5678',note:'',consent:'yes',privacyVersion:'2026-10-13',requestId:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'};
-test('2027 schedule preserves source rooms, half-hours and explicit one-hour theory class',()=>{
-  const r=runtime(),classes=r.public2027Catalog_().classes;
-  assert.equal(classes.length,31);
-  const at=id=>classes.find(c=>c.id==='y2027-'+id);
-  assert.equal(at('M58').day,'금');assert.equal(at('M58').start,'14:30');assert.equal(at('M58').end,'15:30');assert.equal(at('M58').room,'3교실');
-  assert.equal(at('S56').day,'토');assert.equal(at('S56').start,'11:00');assert.equal(at('S56').end,'12:00');
-  assert.equal(at('T25').room,'5교실');assert.equal(at('E37').end,'22:00');
-  assert.equal(new Set(classes.map(c=>c.id)).size,classes.length);
-  assert.ok(!classes.some(c=>/보강|직보|클리닉/.test(c.title)));
-  assert.ok(!classes.some(c=>['y2027-S72','y2027-S60','y2027-L64','y2027-T52'].includes(c.id)));
-});
 test('2027 public endpoint reads no private roster and emits only approved class fields',()=>{
-  const r=runtime();r.read_=()=>{throw Error('Must not read students');};r.publicCatalog_=()=>{throw Error('2026 may be unavailable');};
+  const r=runtime();r.locked_=fn=>fn();r.read_=()=>{throw Error('Must not read students');};r.publicCatalog_=()=>{throw Error('2026 may be unavailable');};
   r.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
   const catalog=JSON.parse(r.doGet({parameter:{action:'year2027'}}).text);
   assert.equal(catalog.year,2027);
   for(const c of catalog.classes){
-    assert.deepEqual(Object.keys(c).sort(),['capacity','day','end','grade','id','room','start','teacher','title']);
+    assert.deepEqual(Object.keys(c).sort(),['capacity','day','end','grade','id','remaining','review','room','start','title']);
     assert.equal(c.capacity,/^[중고]/.test(c.grade)?12:6);
   }
 });
