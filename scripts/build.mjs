@@ -9,3 +9,5 @@ const booking=await fs.readFile('public/booking-domain.js','utf8');
 await fs.writeFile('apps-script/BookingDomain.gs','// Generated from public/booking-domain.js.\n'+booking.replace(/^export /gm,''));
 const review=await fs.readFile('public/review-domain.js','utf8');
 await fs.writeFile('apps-script/ReviewDomain.gs','// Generated from public/review-domain.js.\n'+review.replace(/^export /gm,''));
+const receiptFile=await fs.readFile('public/receipt-file.js','utf8');
+await fs.writeFile('apps-script/ReceiptFile.gs','// Generated from public/receipt-file.js.\n'+receiptFile.replace(/^export /gm,''));
