@@ -1,42 +1,35 @@
 import {receiptFileData} from './receipt-file.js?v=20261021-txt';
+import {makeupItemSummary} from './makeup-batch.js?v=20261021-batch';
 import {submitInline} from './submission.js?v=20261021-portal';
-import {weekLabel} from './booking-domain.js?v=20261020-seminars';
-const $=s=>document.querySelector(s),form=$('#lookup-form'),cancelForm=$('#cancel-booking-form'),api=window.OLTA_CONFIG?.apiUrl;
-let busy=false,verified=null;
-const hints={접수:'보강 요청이 접수되었습니다. 관리자 확인 후 확정됩니다.',확정:'보강 예약이 확정되었습니다. 아래 날짜와 시간을 확인해 주세요.',완료:'보강 수업이 완료되었습니다.',패스:'결석과 보강 패스가 기록되어 있습니다.',취소:'취소된 예약입니다. 보강 자리는 확보되지 않습니다.'};
-function clearResult(){verified=null;$('#save-receipt').hidden=true;$('#save-receipt').removeAttribute('href');$('#save-receipt').removeAttribute('download');$('#booking-result').hidden=true;$('#cancel-status').textContent='';cancelForm.reset();}
-function setBusy(value){busy=value;for(const el of [...form.elements,...cancelForm.elements,$('#refresh-booking')])el.disabled=value;}
-function showBooking(booking){
- $('#booking-status').textContent=booking.status;$('#status-guide').textContent=hints[booking.status]||'학원에 예약 상태를 문의해 주세요.';
- const rows=[['학생',booking.student+' · '+booking.grade],['재원 수업',booking.regularClass],['결석 날짜',booking.absenceDate],['보강 대상 주차',weekLabel(booking.absenceWeek)],['보강 일정',booking.choice==='pass'?'보강 패스':[booking.date,booking.start+'–'+booking.end].join(' ')],['보강 진행 주차',booking.choice==='pass'?'—':weekLabel(booking.weekId)],['보강 방식',booking.choice==='pass'?'패스':booking.choice==='same'?'같은 주차 · 동일 학년 빈자리 수업':'다른 주차 · 수업 전이나 후 30분 이론']];
- if(booking.makeupClass)rows.push(['보강 수업',booking.makeupClass]);if(booking.room)rows.push(['교실',booking.room]);
- const list=$('#booking-details');list.replaceChildren();for(const [key,value] of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=key;dd.textContent=value||'—';list.append(dt,dd);}
+import {weekLabel,bookingToday,bookingDay,makeupChoices,curriculumWeek} from './booking-domain.js?v=20261021-batch';
+const $=s=>document.querySelector(s),form=$('#lookup-form'),editForm=$('#cancel-booking-form'),api=window.OLTA_CONFIG?.apiUrl;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let busy=false,verified=null,bookings=[],options=null;
+const hints={접수:'보강 요청이 접수되었습니다. 관리자 확인 후 확정됩니다.',미예약:'결석만 접수된 상태입니다. 보강 날짜를 예약하거나 패스를 선택해 주세요.',확정:'보강 예약이 확정되었습니다. 날짜와 시간을 확인해 주세요.',완료:'보강 수업이 완료되었습니다.',패스:'결석과 보강 패스가 기록되어 있습니다.',취소:'결석 신청이 취소되었습니다. 보강 자리는 확보되지 않습니다.'};
+function clearResult(){verified=null;bookings=[];options=null;$('#save-receipt').hidden=true;$('#save-receipt').removeAttribute('href');$('#save-receipt').removeAttribute('download');$('#booking-list').replaceChildren();$('#booking-result').hidden=true;$('#cancel-status').textContent='';editForm.reset();}
+function setBusy(value){busy=value;for(const el of [...form.elements,...editForm.elements,$('#refresh-booking'),$('#booking-item')])el.disabled=value;}
+function selected(){return bookings.find(r=>r.id===$('#booking-item').value);}
+function applyResult(result){
+ if(result.id!==verified.id)throw Error('조회 결과를 확인할 수 없습니다. 다시 조회해 주세요.');
+ const rows=result.bookings||[result.booking];if(!rows.length||rows.some(r=>!r?.id))throw Error('결석 수업 목록을 확인할 수 없습니다.');
+ bookings=rows;const old=$('#booking-item').value;$('#booking-item').innerHTML=rows.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.absenceDate+' · '+weekLabel(r.absenceWeek)+' · '+r.status)+'</option>').join('');if(rows.some(r=>r.id===old))$('#booking-item').value=old;
+ const list=$('#booking-list');list.replaceChildren();for(const row of rows){const p=document.createElement('p');p.textContent=makeupItemSummary(row);list.append(p);}
  const portalUrl=new URL('./my-booking.html',location.href).href+'#'+encodeURIComponent(JSON.stringify({id:verified.id,token:verified.token,kind:'absence'}));
- const file=receiptFileData({...verified,portalUrl,message:'조회 시 상태: '+booking.status+'\n보강 대상 주차: '+weekLabel(booking.absenceWeek)+'\n보강 일정: '+(booking.choice==='pass'?'패스':booking.date+' '+booking.start+'–'+booking.end)});
- $('#save-receipt').href=file.href;$('#save-receipt').download=file.filename;$('#save-receipt').hidden=false;
- cancelForm.hidden=!booking.canCancel;cancelForm.reset();$('#booking-result').hidden=false;$('#booking-result').focus();
+ const file=receiptFileData({...verified,portalUrl,message:rows.map(makeupItemSummary).join('\n')});$('#save-receipt').href=file.href;$('#save-receipt').download=file.filename;$('#save-receipt').hidden=false;
+ showSelected();$('#booking-result').hidden=false;$('#booking-result').focus();
 }
-async function lookup(){
- if(busy||!form.reportValidity())return;clearResult();$('#lookup-status').textContent='';
- if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(api||'')){$('#lookup-status').textContent='예약 조회 서버 주소를 확인해 주세요.';return;}
- const credentials={id:form.elements.id.value.trim(),token:form.elements.token.value.trim()};
- setBusy(true);try{
-  // Disabled controls are excluded from a POST. Use a separate request form.
-  const result=await post('makeup_lookup',credentials,'예약 상태를 조회하고 있습니다.');if(!result.booking||result.booking.id!==credentials.id)throw Error('조회 결과를 확인할 수 없습니다. 다시 시도해 주세요.');
-  verified=credentials;showBooking(result.booking);$('#lookup-status').textContent='현재 예약 상태를 확인했습니다.';
- }catch(e){$('#lookup-status').textContent=e.message;}finally{setBusy(false);}
+function showSelected(){
+ const b=selected();if(!b)return;options=null;$('#edit-makeup').hidden=true;editForm.reset();$('#booking-operation').value='book';$('#booking-status').textContent=b.status;$('#status-guide').textContent=hints[b.status]||'학원에 예약 상태를 문의해 주세요.';
+ const rows=[['학생',b.student+' · '+b.grade],['재원 수업',b.regularClass],['결석 날짜',b.absenceDate],['보강 대상 주차',weekLabel(b.absenceWeek)],['보강 일정',b.choice==='wait'?'나중에 예약':b.choice==='pass'?'보강 패스':b.date+' '+b.start+'–'+b.end],['보강 진행 주차',['wait','pass'].includes(b.choice)?'—':weekLabel(b.weekId)]];
+ if(b.makeupClass)rows.push(['보강 수업',b.makeupClass]);if(b.room)rows.push(['교실',b.room]);const list=$('#booking-details');list.replaceChildren();for(const [key,value] of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=key;dd.textContent=value||'—';list.append(dt,dd);}
+ editForm.hidden=!b.canEdit;$('#cancel-status').textContent='';refreshOperation();
 }
-async function post(kind,credentials,message){
- const request=document.createElement('form');request.method='post';request.hidden=true;
- for(const [name,value] of Object.entries({kind,...credentials})){const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;request.append(input);}document.body.append(request);
- try{return await submitInline(request,api,{pendingMessage:message,timeoutMessage:'예약 서버의 응답을 확인하지 못했습니다. 조회 버튼으로 현재 상태를 다시 확인해 주세요.',frameTitle:'보강 예약 조회 결과',onStatus:text=>$(kind==='makeup_lookup'?'#lookup-status':'#cancel-status').textContent=text});}finally{request.remove();}
-}
-form.addEventListener('submit',e=>{e.preventDefault();lookup();});form.addEventListener('input',()=>{if(!busy)clearResult();});$('#refresh-booking').addEventListener('click',lookup);
-cancelForm.addEventListener('submit',async e=>{
- e.preventDefault();if(busy||!verified||!cancelForm.reportValidity())return;const credentials={...verified,confirmCancel:'yes'};$('#cancel-status').textContent='';setBusy(true);
- try{const result=await post('makeup_cancel',credentials,'예약을 취소하고 있습니다.');if(!result.booking||result.booking.status!=='취소')throw Error('취소 결과를 확인할 수 없습니다. 현재 상태를 다시 조회해 주세요.');showBooking(result.booking);$('#cancel-status').textContent=result.message||'예약이 취소되었습니다.';}catch(e){$('#cancel-status').textContent=e.message;}finally{setBusy(false);}
-});
-// Secret links use a fragment, never a query string, referrer, or browser storage.
-let receipt;try{receipt=JSON.parse(decodeURIComponent(location.hash.slice(1)));}catch{}
-if(location.hash)history.replaceState(null,'',location.pathname);
-if(receipt?.kind==='absence'&&/^[a-zA-Z0-9-]{16,64}$/.test(receipt.id||'')&&/^[a-f0-9]{32,64}$/i.test(receipt.token||'')){form.elements.id.value=receipt.id;form.elements.token.value=receipt.token;lookup();}
+function refreshOperation(){const op=$('#booking-operation').value;$('#load-options').hidden=op!=='book';$('#edit-makeup').hidden=op!=='book'||!options;$('#operation-guide').textContent={book:'날짜를 변경하면 기존 보강 자리는 해제되고 새 일정은 관리자 확인 대기로 접수됩니다.',wait:'현재 보강 자리만 해제합니다. 결석 기록은 남으며 나중에 보강 날짜를 다시 예약할 수 있습니다.',pass:'해당 결석 수업을 보강 패스로 기록합니다. 기존 보강 자리는 해제됩니다.',cancelAbsence:'선택한 날짜의 결석 신청과 보강을 함께 취소합니다. 다른 결석 수업에는 영향을 주지 않습니다.'}[op];editForm.elements.confirmChange.checked=false;}
+function currentChoices(){const b=selected(),cls=options?.classes.find(c=>c.id===b.targetId);return cls?makeupChoices(cls,b.absenceDate,$('#edit-date').value,options):[];}
+function refreshSessions(){const b=selected(),choices=currentChoices();$('#edit-session').innerHTML='<option value="">시간을 선택해 주세요</option>'+choices.map(c=>'<option value="'+esc(c.classId+'|'+c.position)+'">'+esc(c.start+'–'+c.end+(c.choice==='same'?' · 같은 주차 빈자리 수업 · '+c.room:' · 정규 수업 '+(c.position==='before'?'전':'후')+' 30분'))+'</option>').join('');const date=$('#edit-date').value,week=date?curriculumWeek(date,b.grade,options.weeks):'';$('#edit-week').textContent='결석 수업: '+weekLabel(b.absenceWeek)+(week?' / 보강 진행: '+weekLabel(week):'');}
+async function post(kind,extra,message){const request=document.createElement('form');request.method='post';request.hidden=true;for(const [name,value] of Object.entries({kind,...verified,...extra})){const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;request.append(input);}document.body.append(request);try{return await submitInline(request,api,{pendingMessage:message,timeoutMessage:'응답을 확인하지 못했습니다. 현재 상태를 다시 조회한 뒤 진행해 주세요.',frameTitle:'보강 예약 조회 결과',onStatus:text=>$(kind==='makeup_lookup'?'#lookup-status':'#cancel-status').textContent=text});}finally{request.remove();}}
+async function lookup(){if(busy||!form.reportValidity())return;clearResult();if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(api||'')){$('#lookup-status').textContent='예약 조회 서버 주소를 확인해 주세요.';return;}verified={id:form.elements.id.value.trim(),token:form.elements.token.value.trim()};setBusy(true);try{applyResult(await post('makeup_lookup',{},'예약 상태를 조회하고 있습니다.'));$('#lookup-status').textContent='현재 예약 상태를 확인했습니다.';}catch(e){clearResult();$('#lookup-status').textContent=e.message;}finally{setBusy(false);}}
+form.addEventListener('submit',e=>{e.preventDefault();lookup();});form.addEventListener('input',()=>{if(!busy)clearResult();});$('#refresh-booking').addEventListener('click',lookup);$('#booking-item').addEventListener('change',showSelected);$('#booking-operation').addEventListener('change',refreshOperation);$('#edit-date').addEventListener('change',refreshSessions);
+$('#load-options').addEventListener('click',async()=>{if(busy||!verified)return;setBusy(true);try{const b=selected(),result=await post('makeup_options',{itemId:b.id},'보강 가능한 날짜를 확인하고 있습니다.');if(result.id!==verified.id||!result.options)throw Error('일정을 다시 확인해 주세요.');options=result.options;const cls=options.classes.find(c=>c.id===b.targetId),dates=[...new Set(options.weeks.map(w=>w.date))].filter(d=>d>=bookingToday()&&makeupChoices(cls,b.absenceDate,d,options).length).sort();$('#edit-date').innerHTML='<option value="">날짜를 선택해 주세요</option>'+dates.map(d=>'<option value="'+d+'">'+esc(d+' ('+bookingDay(d)+')')+'</option>').join('');$('#edit-makeup').hidden=false;$('#cancel-status').textContent=dates.length?'가능한 날짜와 시간을 선택해 주세요.':'현재 예약 가능한 날짜가 없습니다. 학원으로 문의해 주세요.';refreshSessions();}catch(e){$('#cancel-status').textContent=e.message;}finally{setBusy(false);}});
+editForm.addEventListener('submit',async e=>{e.preventDefault();if(busy||!verified||!editForm.reportValidity())return;const b=selected(),operation=$('#booking-operation').value,choice=currentChoices().find(c=>c.classId+'|'+c.position===$('#edit-session').value);if(operation==='book'&&!choice){$('#cancel-status').textContent='보강할 날짜와 시간을 선택해 주세요.';return;}setBusy(true);try{const result=await post('makeup_update',{itemId:b.id,revision:b.revision,operation,confirmChange:'yes',...(choice?{choice:choice.choice,date:choice.date,makeupClassId:choice.classId,position:choice.position}:{})},'선택한 내용을 처리하고 있습니다.');applyResult(result);$('#cancel-status').textContent=result.message;}catch(e){$('#cancel-status').textContent=e.message;}finally{setBusy(false);}});
+let receipt;try{receipt=JSON.parse(decodeURIComponent(location.hash.slice(1)));}catch{}if(location.hash)history.replaceState(null,'',location.pathname);if(receipt?.kind==='absence'&&/^[a-zA-Z0-9-]{16,64}$/.test(receipt.id||'')&&/^[a-f0-9]{32,64}$/i.test(receipt.token||'')){form.elements.id.value=receipt.id;form.elements.token.value=receipt.token;lookup();}
