@@ -114,7 +114,7 @@ function render2027(){
   const day=$('#year2027-day').value,days=['월','화','수','목','금','토','일'];
   const filtered=classes.filter(c=>(!selected||c.grade===selected)&&(!day||c.day===day)).sort((a,b)=>days.indexOf(a.day)-days.indexOf(b.day)||a.start.localeCompare(b.start)||a.grade.localeCompare(b.grade));
   status.textContent='2027년 정규 수업 '+filtered.length+'개 · 예상 시간표 기준';
-  grid.innerHTML=filtered.map(c=>'<article class="upcoming-card"><span class="grade-label">2027년 '+esc(c.grade)+'</span><h3>'+esc(c.day)+'요일 '+esc(c.start)+'–'+esc(c.end)+'</h3><p>'+esc(c.title)+' · '+esc(c.room)+' · 정원 '+(Number(c.capacity)||classCapacity(c))+'명</p><p class="teacher">'+esc(c.teacher||'담당 선생님은 상담 시 안내')+'</p><button class="card-button" data-request="year2027" data-id="'+esc(c.id)+'">2027년 수업 신청 ↗</button></article>').join('')||'<p class="empty">조건에 맞는 수업이 없습니다. 다른 학년·요일을 선택해 주세요.</p>';
+  grid.innerHTML=filtered.map(c=>'<article class="upcoming-card"><span class="grade-label">2027년 '+esc(c.grade)+'</span><h3>'+esc(c.day)+'요일 '+esc(c.start)+'–'+esc(c.end)+'</h3><p>'+esc(c.title)+' · '+esc(c.room)+' · 정원 '+(Number(c.capacity)||classCapacity(c))+'명</p><button class="card-button" data-request="year2027" data-id="'+esc(c.id)+'">2027년 수업 신청 ↗</button></article>').join('')||'<p class="empty">조건에 맞는 수업이 없습니다. 다른 학년·요일을 선택해 주세요.</p>';
 }
 $('#year2027-grade').onchange=render2027;$('#year2027-day').onchange=render2027;
 if(location.hash==='#year2027'||new URLSearchParams(location.search).get('year')==='2027')selectTab('year2027');
