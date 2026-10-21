@@ -1,7 +1,7 @@
 /** Private source -> private snapshot -> anonymous class metadata. Never publish names. */
 const YEAR2027_SOURCE_={spreadsheetId:'1omBPwVh6sDcH3kF7V22V1ZK8HGWsxsQA22OsAqHPDQE',sheetId:74444574};
 const YEAR2027_TABLES_={
- '2027반설정':['id','grade','title','day','start','end','room','teacher','sourceCell','registered','capacity','remaining','review','issues','updatedAt'],
+ '2027반설정':['id','grade','title','day','start','end','room','teacher','sourceCell','registered','capacity','remaining','review','issues','updatedAt','resources'],
  '2027원생':['classId','name','status','sourceCell','updatedAt'],
  '2027확인필요':['sourceCell','day','start','end','room','header','issue','updatedAt']
 };
@@ -102,7 +102,7 @@ function ensure2027Tables_(){
  for(const [name,headers] of Object.entries(YEAR2027_TABLES_)){
   let s=db.getSheetByName(name);if(!s)s=db.insertSheet(name);
   if(!s.getLastRow()){s.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e5eddc');s.setFrozenRows(1);s.setColumnWidth(1,150);s.setColumnWidth(headers.indexOf('issues')+1||headers.indexOf('issue')+1||1,300);}
-  else{const actual=s.getRange(1,1,1,headers.length).getDisplayValues()[0];if(!headers.every((h,i)=>actual[i]===h))throw Error(name+' 시트의 열 제목을 확인하세요.');}
+  else{const actual=s.getRange(1,1,1,headers.length).getDisplayValues()[0];if(name==='2027반설정'&&headers.slice(0,-1).every((h,i)=>actual[i]===h)&&!actual[headers.length-1])s.getRange(1,headers.length).setValue('resources');else if(!headers.every((h,i)=>actual[i]===h))throw Error(name+' 시트의 열 제목을 확인하세요.');}
  }
 }
 function sync2027Timetable(){admin_();return locked_(()=>sync2027Timetable_());}
@@ -114,7 +114,7 @@ function sync2027Timetable_(){
  const result=parse2027Timetable_(range.getDisplayValues(),range.getBackgrounds()),timestamp=now_();
  if(!result.classes.length)throw Error('2027 정규 수업을 읽지 못했습니다. 원본 배치를 확인하세요.');
  ensure2027Tables_();
- write_('2027반설정',result.classes.map(c=>({...c,review:String(c.review),issues:c.issues.join('\n'),updatedAt:timestamp})));
+ write_('2027반설정',result.classes.map(c=>({...c,review:String(c.review),issues:c.issues.join('\n'),updatedAt:timestamp,resources:JSON.stringify((c.parts||[c]).map(x=>({day:x.day,start:x.start,end:(x.issues||[]).some(issue=>/시작·종료 시간 확인|수업 시간 영역 확인/.test(issue))?'':x.end,room:x.room,teacher:x.teacher})))})));
  write_('2027원생',result.roster.map(r=>({...r,updatedAt:timestamp})));
  write_('2027확인필요',result.classes.filter(c=>c.review).map(c=>({sourceCell:c.sourceCell,day:c.day,start:c.start,end:c.end,room:c.room,header:c.header,issue:c.issues.join('\n'),updatedAt:timestamp})));
  for(const [name,headers] of Object.entries(YEAR2027_TABLES_)){const sheet=db_().getSheetByName(name);if(sheet.getLastRow()>1)sheet.getRange(2,1,sheet.getLastRow()-1,headers.length).setVerticalAlignment('top').setWrap(true);}
@@ -132,6 +132,15 @@ function public2027Catalog_(){
  const p=props_();if(!p.getProperty('PRIVACY_CONTACT'))throw Error('상담 연락처를 준비 중입니다.');
  const snapshot=read2027Snapshot_();
  return {year:2027,mode:'live',updatedAt:snapshot.updatedAt,classes:snapshot.classes.filter(c=>c.grade).map(c=>({id:c.id,grade:c.grade,title:c.title,day:c.day,start:c.start,end:c.end,room:c.room,capacity:c.capacity,remaining:c.review?0:c.remaining,review:c.review})),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT'),sourceTitle:'2027 예상'};
+}
+// Use the private 2027 snapshot only; never send teacher resources to the browser.
+function opening2027Catalog_(){
+ try{
+  const snapshot=read2027Snapshot_();if(catalogStale_(snapshot.updatedAt))throw Error('2027 시간표 동기화가 필요합니다.');
+  const resources=snapshot.classes.flatMap(c=>{const rows=JSON.parse(c.resources||'null');if(!Array.isArray(rows)||!rows.length||rows.some(x=>!x||x.day!==c.day||typeof x.start!=='string'||typeof x.end!=='string'||typeof x.room!=='string'||typeof x.teacher!=='string'))throw Error('2027 수업 점유 정보를 동기화하세요.');return rows;});
+  const slots=generateOpeningSlots(resources,1).map(s=>({...s,id:s.id.replace(/^opening-/,'opening2027-')}));
+  return {slots,openingYear:2027,openingSemester:1,openingUpdatedAt:snapshot.updatedAt};
+ }catch(error){console.error('2027 opening slots unavailable: '+error.message);return {slots:[],openingYear:2027,openingSemester:1,openingUpdatedAt:'',openingError:'2027 시간표 확인 후 개설 가능 시간을 표시합니다. 관리자에게 동기화를 요청해 주세요.'};}
 }
 function cached2027Catalog_(){
  let cache;try{cache=CacheService.getScriptCache();const raw=cache.get('public-2027-v1');if(raw){const v=JSON.parse(raw);if(!catalogStale_(v.updatedAt))return v;}}catch(e){}
