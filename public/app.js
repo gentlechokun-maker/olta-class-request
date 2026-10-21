@@ -42,7 +42,7 @@ function render(){
 function selectTab(tab){state.tab=tab;mobileState.page=0;mobileState.day='';renderMobile();for(const t of ['existing','year2027','new','makeup']){const active=t===tab;$('#tab-'+t).setAttribute('aria-selected',String(active));$('#tab-'+t).tabIndex=active?0:-1;$('#panel-'+t).hidden=!active;}$('#filters').hidden=tab==='year2027';$('.mobile-controls').hidden=tab==='year2027';if(tab==='year2027')load2027();$('#classes').scrollIntoView({behavior:'smooth',block:'start'});}
 function openRequest(kind,id){
   if(kind==='makeup'){location.href='./booking.html?kind=absence&targetId='+encodeURIComponent(id);return;}
-  const catalog=kind==='year2027'?upcoming.catalog:state.catalog;if(!catalog)return;const target=(kind==='new'?catalog.slots:catalog.classes).find(c=>c.id===id);if(!target||(kind==='existing'&&(target.review||target.remaining<1)))return;
+  const catalog=kind==='year2027'?upcoming.catalog:state.catalog;if(!catalog)return;const target=(kind==='new'?catalog.slots:catalog.classes).find(c=>c.id===id);if(!target||(['existing','year2027'].includes(kind)&&(target.review||target.remaining<1)))return;
   const form=$('#request-form');if(form.dataset.sending==='true'){if(!$('#request-dialog').open)$('#request-dialog').showModal();return;}form.hidden=false;$('#request-result').hidden=true;form.reset();form.elements.kind.value=kind;form.elements.targetId.value=id;form.elements.requestId.value=crypto.randomUUID();
   const grades=kind==='year2027'?[target.grade]:studentGrades(kind==='new'?target.grades:[target.grade]);form.elements.grade.innerHTML=grades.map(g=>`<option>${esc(g)}</option>`).join('');const selectedGrade=mobileMedia.matches?mobileState.grade:state.grade;if(grades.includes(selectedGrade))form.elements.grade.value=selectedGrade;
   renderPrivacy(catalog);if(kind==='year2027')$('#consent-description').textContent=`수집 항목: 원생 이름·2027년 학년, 보호자 연락처, 상담 참고 내용 / 목적: 2027년 수강 상담 및 연락 / 보관: 접수 후 ${Number(catalog.retentionDays)||90}일. 문의·삭제 요청: ${catalog.privacyContact||'운영자 상담 담당'}`;$('#request-grade-label').textContent=kind==='year2027'?'2027년 기준 학년':'희망 학년';
@@ -108,12 +108,12 @@ function render2027(){
   const status=$('#year2027-status'),grid=$('#year2027-grid');
   if(upcoming.loading){status.textContent='2027년 시간표를 확인하고 있습니다.';grid.innerHTML='';return;}
   if(upcoming.error){status.textContent=upcoming.error;grid.innerHTML='<button type="button" id="year2027-retry">다시 확인</button>';$('#year2027-retry').onclick=()=>load2027(true);return;}
-  const classes=upcoming.catalog?.classes||[],select=$('#year2027-grade'),selected=select.value;
+  const classes=(upcoming.catalog?.classes||[]).filter(c=>!c.review&&Number(c.remaining)>0),select=$('#year2027-grade'),selected=select.value;
   const grades=[...new Set(classes.map(c=>c.grade))].sort((a,b)=>['초','중','고'].indexOf(a[0])-['초','중','고'].indexOf(b[0])||Number(a.slice(1))-Number(b.slice(1)));
   select.innerHTML='<option value="">전체 학년</option>'+grades.map(g=>'<option>'+esc(g)+'</option>').join('');select.value=selected;
   const day=$('#year2027-day').value,days=['월','화','수','목','금','토','일'];
   const filtered=classes.filter(c=>(!selected||c.grade===selected)&&(!day||c.day===day)).sort((a,b)=>days.indexOf(a.day)-days.indexOf(b.day)||a.start.localeCompare(b.start)||a.grade.localeCompare(b.grade));
-  status.textContent='2027년 정규 수업 '+filtered.length+'개 · 예상 시간표 기준';
+  status.textContent='신청 가능한 2027년 수업 '+filtered.length+'개'+(upcoming.catalog?.updatedAt?' · 확인 '+new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(upcoming.catalog.updatedAt)):'');
   grid.innerHTML=filtered.map(c=>'<article class="upcoming-card"><span class="grade-label">2027년 '+esc(c.grade)+'</span><h3>'+esc(c.day)+'요일 '+esc(c.start)+'–'+esc(c.end)+'</h3><p>'+esc(c.title)+' · '+esc(c.room)+' · 정원 '+(Number(c.capacity)||classCapacity(c))+'명</p><button class="card-button" data-request="year2027" data-id="'+esc(c.id)+'">2027년 수업 신청 ↗</button></article>').join('')||'<p class="empty">조건에 맞는 수업이 없습니다. 다른 학년·요일을 선택해 주세요.</p>';
 }
 $('#year2027-grade').onchange=render2027;$('#year2027-day').onchange=render2027;
