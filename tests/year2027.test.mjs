@@ -17,7 +17,7 @@ function runtime(){
   r.read2027Snapshot_=()=>({updatedAt:new Date().toISOString(),classes:[{id:'y2027-C13',grade:'초4',title:'아톰 2',day:'월',start:'14:00',end:'15:00',room:'2교실',capacity:6,remaining:1,review:false},{id:'y2027-E37',grade:'고2',title:'물리',day:'월',start:'20:00',end:'22:00',room:'5교실',capacity:12,remaining:12,review:false}]});
   return r;
 }
-const input={kind:'year2027',targetId:'y2027-C13',grade:'초4',student:'예시학생',phone:'010-1234-5678',note:'',consent:'yes',privacyVersion:'2026-10-13',requestId:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'};
+const input={scheduleKey:JSON.stringify(['y2027-C13','초4','아톰 2','월','14:00','15:00','2교실']),kind:'year2027',targetId:'y2027-C13',grade:'초4',student:'예시학생',phone:'010-1234-5678',note:'',consent:'yes',privacyVersion:'2026-10-13',requestId:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'};
 test('2027 public endpoint reads no private roster and emits only approved class fields',()=>{
   const r=runtime();r.locked_=fn=>fn();r.read_=()=>{throw Error('Must not read students');};r.publicCatalog_=()=>{throw Error('2026 may be unavailable');};
   r.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
@@ -31,7 +31,7 @@ test('2027 public endpoint reads no private roster and emits only approved class
 test('2027 validation rejects mismatched grades, current classes, incomplete courses and missing consent',()=>{
   const r=runtime();assert.equal(r.validate2027_(input).phone,'01012345678');
   for(const change of [{grade:'초5'},{targetId:'current-class'},{targetId:'y2027-L64'},{consent:''},{kind:'existing'},{website:'spam'},{phone:'123'},{privacyVersion:'old'}])assert.throws(()=>r.validate2027_({...input,...change}));
-  assert.equal(r.validate2027_({...input,targetId:'y2027-E37',grade:'고2'}).grade,'고2');
+  assert.equal(r.validate2027_({...input,targetId:'y2027-E37',grade:'고2',scheduleKey:JSON.stringify(['y2027-E37','고2','물리','월','20:00','22:00','5교실'])}).grade,'고2');
 });
 test('2027 submission uses private requests with idempotency, duplicate detection and throttling',()=>{
   const r=runtime(),rows=[];r.read_=()=>rows;r.append_=(table,row)=>{assert.equal(table,'신청');rows.push(row);};
@@ -57,4 +57,10 @@ test('2027 review requires admin and cannot change current-year requests or clai
   assert.throws(()=>r.review2027Request('next','확정'),/상태/);
   r.review2027Request('next','상담 완료');assert.equal(rows[1].status,'상담 완료');
   r.review2027Request('next','취소');assert.throws(()=>r.review2027Request('next','상담 중'),/찾을/);
+});
+
+test('a stale open form cannot book a changed time and receipts preserve the chosen schedule',()=>{
+ const r=runtime(),snapshot=r.read2027Snapshot_;assert.match(r.validate2027_(input).note,/접수 당시 수업.*14:00–15:00/);
+ r.read2027Snapshot_=()=>{const result=snapshot();result.classes[0].start='15:00';result.classes[0].end='16:00';return result;};
+ assert.throws(()=>r.validate2027_(input),/시간이 변경/);assert.throws(()=>r.validate2027_({...input,scheduleKey:''}),/시간이 변경/);
 });
