@@ -58,7 +58,7 @@ test('public display uses snapshots and explicit administrator synchronization r
  const r=runtime(),f=fixture(),calls=[],writes=[],props={PRIVACY_CONTACT:'학원 상담'};f.block(13,3,4,'신T 초4',['가학생']);
  r.props_=()=>({getProperty:k=>props[k],setProperties:x=>Object.assign(props,x)});r.ensure2027Tables_=()=>{};r.write_=(name,rows)=>writes.push({name,rows});
  r.SpreadsheetApp={flush(){calls.push('flush');},openById:id=>{calls.push(id);return {getSheets:()=>[{getSheetId:()=>74444574,getLastRow:()=>88,getLastColumn:()=>23,getRange:()=>({getDisplayValues:()=>f.values,getBackgrounds:()=>f.backgrounds})}]};}};
- r.db_=()=>({getSheetByName:()=>({getLastRow:()=>1})});r.sync2027Timetable_();assert.equal(writes.length,3);assert.equal(writes[0].name,'2027반설정');assert.equal(writes[1].rows[0].status,'registered');assert.ok(props.YEAR2027_LAST_SYNC);assert.ok(calls.includes('1omBPwVh6sDcH3kF7V22V1ZK8HGWsxsQA22OsAqHPDQE'));
+ r.db_=()=>({getSheetByName:()=>({getLastRow:()=>1})});r.sync2027Timetable_();assert.equal(writes.length,3);assert.equal(writes[0].name,'2027반설정');assert.equal(writes[1].rows[0].status,'registered');assert.equal(JSON.parse(writes[0].rows[0].resources)[0].teacher,'신T');assert.ok(!writes[0].rows[0].resources.includes('가학생'));assert.ok(props.YEAR2027_LAST_SYNC);assert.ok(calls.includes('1omBPwVh6sDcH3kF7V22V1ZK8HGWsxsQA22OsAqHPDQE'));
  r.read_=name=>writes.find(x=>x.name===name).rows;r.SpreadsheetApp.openById=()=>{throw Error('Public requests must not read the source');};assert.equal(r.public2027Catalog_().classes.length,1);
 });
 
