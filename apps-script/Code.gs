@@ -198,13 +198,14 @@ function inlineReceipt_(result,input){
 function validate2027_(input){
   const target=read2027Snapshot_().classes.find(c=>c.id===input.targetId&&!c.review&&c.remaining>0),student=normalizeName(input.student),phone=normalizePhone(input.phone),grade=String(input.grade||''),note=String(input.note||'').trim(),requestId=String(input.requestId||'');
   if(input.kind!=='year2027'||input.website||!target||grade!==target.grade)throw new Error('2027년 신청 수업과 학년을 다시 확인해 주세요.');
+  if(input.scheduleKey!==JSON.stringify([target.id,target.grade,target.title,target.day,target.start,target.end,target.room]))throw new Error('수업 시간이 변경되었습니다. 화면을 새로고침하고 수업을 다시 선택해 주세요.');
   if(student.length<2||student.length>30||/[<>\r\n]/.test(student))throw new Error('원생 이름을 확인해 주세요.');
   if(!/^01[016789]\d{7,8}$/.test(phone))throw new Error('보호자의 휴대전화 번호를 확인해 주세요.');
   if(input.consent!=='yes')throw new Error('개인정보 수집·이용 동의가 필요합니다.');
   if(input.privacyVersion!=='2026-10-13')throw new Error('신청 화면을 새로고침해 주세요.');
   if(!/^[a-zA-Z0-9-]{16,64}$/.test(requestId))throw new Error('신청 화면을 다시 열어 주세요.');
   if(note.length>300)throw new Error('참고 내용은 300자 이내로 입력해 주세요.');
-  return {kind:'year2027',targetId:target.id,student,phone,grade,note,requestId};
+  return {kind:'year2027',targetId:target.id,student,phone,grade,note:'[접수 당시 수업] '+[target.grade,target.title,target.day+'요일',target.start+'–'+target.end,target.room].join(' · ')+(note?'\n'+note:''),requestId};
 }
 function submit2027_(input){
   public2027Catalog_();
