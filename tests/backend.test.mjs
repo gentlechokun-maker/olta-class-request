@@ -41,7 +41,7 @@ test('GitHub artifact contains no server code or private records',()=>{
 test('public catalog excludes roster/contacts and fails closed on stale or edited mappings',()=>{
   const r=runtime(),c={id:'c1',grade:'초3',title:'아톰 1',day:'월',start:'14:00',end:'15:00',room:'2교실',teacher:'담당',teacherColor:'#e8eed8',sourceRange:'C10:C12'};
   const properties={LAST_SYNC:new Date().toISOString(),PRIVACY_CONTACT:'학원 연락처',RETENTION_DAYS:'90'};
-  r.props_=()=>({getProperty:key=>properties[key]});r.classes_=()=>[c];
+  r.props_=()=>({getProperty:key=>properties[key]});r.classes_=()=>[c];r.opening2027Catalog_=()=>({slots:r.catalogStale_(properties.LAST_SYNC)?[]:r.generateOpeningSlots([c],1),openingYear:2027,openingUpdatedAt:properties.LAST_SYNC});
   const tables={'동기화':[{classId:'c1',registered:'4',starting:'1',paused:'2',review:'false',configKey:r.classKey_(c)}],'빈시간':[{id:'s1',day:'월',start:'16:00',end:'17:00',room:'2교실',grades:'초3',enabled:'TRUE'}],'신청':[{kind:'new',targetId:'s1',grade:'초3',student:'비공개이름',phone:'01012345678',status:'접수'}]};r.read_=name=>tables[name];
   const good=r.publicCatalog_();assert.equal(good.classes[0].remaining,1);assert.equal(good.classes[0].review,false);assert.ok(good.slots.length>0);assert.ok(!JSON.stringify(good).includes('비공개이름'));assert.ok(!JSON.stringify(good).includes('01012345678'));assert.ok(!JSON.stringify(good).includes('C10:C12'));
   c.sourceRange='D10:D12';assert.equal(r.publicCatalog_().classes[0].review,true);
