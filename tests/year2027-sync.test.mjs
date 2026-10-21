@@ -61,3 +61,8 @@ test('public display uses snapshots and explicit administrator synchronization r
  r.db_=()=>({getSheetByName:()=>({getLastRow:()=>1})});r.sync2027Timetable_();assert.equal(writes.length,3);assert.equal(writes[0].name,'2027반설정');assert.equal(writes[1].rows[0].status,'registered');assert.ok(props.YEAR2027_LAST_SYNC);assert.ok(calls.includes('1omBPwVh6sDcH3kF7V22V1ZK8HGWsxsQA22OsAqHPDQE'));
  r.read_=name=>writes.find(x=>x.name===name).rows;r.SpreadsheetApp.openById=()=>{throw Error('Public requests must not read the source');};assert.equal(r.public2027Catalog_().classes.length,1);
 });
+
+test('a dated regular-class heading is reviewed rather than silently treated as a makeup',()=>{
+ const r=runtime(),f=fixture();f.block(13,3,4,'신T 초4 10/24 시작',['가학생']);
+ const result=r.parse2027Timetable_(f.values,f.backgrounds);assert.equal(result.classes.length,1);assert.equal(result.ignored.dated,0);assert.equal(result.classes[0].review,true);assert.match(result.classes[0].issues.join(' '),/정규반/);
+});
