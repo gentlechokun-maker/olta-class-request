@@ -51,7 +51,10 @@ function parse2027Timetable_(values,backgrounds){
      const startMinute=timeAt(startRow),endMinute=timeAt(stop);
      const c={id:'y2027-'+a1Year2027_(startRow,col),sourceCell:a1Year2027_(startRow,col),grade:h.grade,day:day.day,room,teacher:h.teacher,header:h.s,start:startMinute===null?'':minuteYear2027_(startMinute),end:endMinute===null?'':minuteYear2027_(endMinute),title:'',names:[],issues:[],column:col,segment:h.course};
      // Dated one-off entries, including undated continuation lines in that block, never form a regular class.
-     if(/(?:\d{1,2}\s*월\s*\d{1,2}\s*일|\d{1,2}[/.]\d{1,2})/.test(h.s)){ignored.dated++;continue;}
+     const dated=/(?:\d{1,2}\s*월\s*\d{1,2}\s*일|\d{1,2}[/.]\d{1,2})/.test(h.s);
+     if(dated&&(h.excluded||!h.grade)){ignored.dated++;continue;}
+     if(dated)c.issues.push('날짜 표시가 있는 정규반인지 확인 필요');
+     if(/[\r\n]/.test(h.s))c.issues.push('수업 제목과 원생 이름을 별도 셀로 분리 필요');
      if(h.excluded){ignored.special++;continue;}
      if(!h.grade)c.issues.push('학년 확인 필요');
      if(startMinute===null||endMinute===null||startMinute>=endMinute||endMinute>1320||startMinute%30||endMinute%30)c.issues.push('시작·종료 시간 확인 필요');
