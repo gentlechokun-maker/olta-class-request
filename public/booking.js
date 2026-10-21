@@ -12,12 +12,13 @@ const requestedScope=kind==='cancel'?(receipt?.kind||params.get('bookingKind')||
 const scope=['seminar','visit','absence','consultation'].includes(requestedScope)?requestedScope:'seminar';
 const scopeTitle={seminar:'설명회 신청',visit:'방문 상담 예약',absence:'결석·보강 예약',consultation:'상담 신청'}[scope];
 const cancelTitle={seminar:'설명회 신청 취소',visit:'방문 상담 예약 취소',absence:'결석·보강 예약 취소',consultation:'상담 예약 취소'}[scope];
-$('#seminar-navigation').hidden=scope!=='seminar';
+$('#seminar-navigation').hidden=scope!=='seminar';$('#makeup-lookup-link').hidden=scope!=='absence';
 $('#page-heading').textContent=kind==='cancel'?cancelTitle:scopeTitle;
 $('#note-label').textContent=kind==='seminar'?'간단히 자녀의 과학 공부에 대한 고민을 들려주세요. 고민들을 모아 실질적인 도움이 되도록 하겠습니다.':'상담 참고 내용 (선택)';
 document.title=(kind==='cancel'?cancelTitle:scopeTitle)+' | 올타과학';
 $('#cancel-link').href='./booking.html?kind=cancel&bookingKind='+scope;
 $('#cancel-link').textContent=cancelTitle;
+if(scope==='absence'){$('#cancel-link').href='./my-booking.html';$('#cancel-link').textContent='보강 예약 조회·취소';}
 $('#cancel-link').hidden=kind==='cancel';
 $('#cancel-heading').textContent=cancelTitle;
 $('#cancel-guide').textContent='접수 결과에 표시된 접수번호와 확인 코드를 입력해 주세요.'+(scope==='seminar'?' 대면 설명회는 전날 14시까지 취소할 수 있습니다. 온라인 설명회에는 취소 기한이 없습니다.':'');
