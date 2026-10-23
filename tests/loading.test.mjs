@@ -41,7 +41,7 @@ test('display cache skips locks and sheet reads on hits, expires and invalidates
 
 test('cache double-check avoids repeating work after a competing builder finishes',()=>{
  const {r,store}=runtime();let builds=0;r.bookingPageCatalog_=()=>{builds++;return {bookingEnabled:true,classes:[]};};
- r.locked_=fn=>{store.set('public-booking-v3:seminar',JSON.stringify({expiresAt:Date.parse('2026-10-20T03:01:00Z'),data:{bookingEnabled:true,classes:[],seminars:[]}}));return fn();};
+ r.locked_=fn=>{store.set('public-booking-v4:seminar',JSON.stringify({expiresAt:Date.parse('2026-10-20T03:01:00Z'),data:{bookingEnabled:true,classes:[],seminars:[]}}));return fn();};
  assert.equal(r.cachedBookingPage_('seminar').bookingEnabled,true);assert.equal(builds,0);
 });
 
