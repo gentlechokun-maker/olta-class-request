@@ -18,7 +18,10 @@ function headingYear2027_(text){
 function namesYear2027_(text){
  const names=[],issues=[];
  const s=String(text||'').normalize('NFKC').replace(/\([^)]*\)/g,' ').replace(/[\[\]{}]/g,' ');
- for(const word of s.split(/[\s,，/]+/).filter(Boolean)){
+ for(const token of s.split(/[\s,，/]+/).filter(Boolean)){
+  // Explicit school/grade notes are not student names. Keep unfamiliar notes reviewable.
+  if(/^(?:소현|서원|정평|이현|성서|성복|다산)(?:초|중|고)[1-6]?$/.test(token))continue;
+  const word=token.replace(/매주지각$/,'');
   if(/^(?:이동|결석|휴원|화학|물리|과학|이론|실험|매주지각|서술형|분일찍|까지옴)$/.test(word)||/^\d/.test(word))continue;
   const match=word.match(/^([가-힣]{2,4})(?=\d|$)/);
   if(match)names.push(match[1]);else issues.push('원생 이름과 메모 분리 필요');
@@ -41,7 +44,7 @@ function parse2027Timetable_(values,backgrounds){
    const anchors=[];for(let r=band.r+2;r<endBand;r++){const label=get(r,timeCol)||(!['토','일'].includes(day.day)?get(r,band.days[0].col-1):''),m=label.match(/^(\d{1,2})(?:시)?$/);if(m){let h=Number(m[1]);if(!anchors.length&&h<10&&!(['토','일'].includes(day.day)&&h===9))h+=12;while(anchors.length&&h*60<=anchors[anchors.length-1].time)h+=12;anchors.push({r,time:h*60});}}
    const timeAt=r=>{let a;for(const x of anchors)if(x.r<=r)a=x;if(!a)return null;const next=anchors.find(x=>x.r>a.r);if(next&&(next.r-a.r!==4||next.time-a.time!==60))return r===a.r?a.time:null;return a.time+(r-a.r)*15;};
    for(let col=day.col;col<endCol;col++){
-    const room=get(band.r+1,col);if(!/^\d+교실$/.test(room))continue;
+    const room=get(band.r+1,col);if(!/^\d+교실$/.test(room)||excludedWeekendRoom2027({day:day.day,room}))continue;
     let r=band.r+2;
     while(r<endBand){
      const h=headingYear2027_(get(r,col));if(!h.header){if(h.s)ignored.namesOnly++;r++;continue;}
@@ -63,6 +66,10 @@ function parse2027Timetable_(values,backgrounds){
      if(['중1','중2','고1','고2'].includes(h.grade)&&endMinute-startMinute!==(/스레드/.test(h.course)?180:120))c.issues.push(h.grade+' 이론 수업 시간 확인 필요');
      const basic={'초1':'빅뱅','초2':'빅뱅','초3':'아톰 1','초4':'아톰 2','초5':'퀀텀 1','초6':'퀀텀 2','중1':'니들','중2':'니들','중3':'스레드'};
      c.title=h.course?(h.grade==='초6'?'퀀텀 2 · ':'')+h.course:basic[h.grade]||'과학';
+     if(c.grade==='중2'){
+      const schools={'금':'이현·성서','수':'서원','토':'소현·서원·정평'}[c.day];
+      if(schools)c.title+=' · 학교: '+schools;
+     }
      const seen=new Set();
      for(let nr=startRow+1;h.grade&&nr<stop;nr++){
       const text=get(nr,col);if(!text||text===h.course)continue;
@@ -111,7 +118,7 @@ function sync2027Timetable_(){
  const source=SpreadsheetApp.openById(id).getSheets().find(s=>s.getSheetId()===sheetId);if(!source)throw Error('2027 원본 시간표 탭을 찾을 수 없습니다.');
  if(source.getLastRow()>300||source.getLastColumn()>32)throw Error('2027 시간표 범위가 변경되었습니다. 판독 범위를 확인하세요.');
  const range=source.getRange(1,1,Math.max(100,source.getLastRow()),Math.max(23,source.getLastColumn()));
- const result=parse2027Timetable_(range.getDisplayValues(),range.getBackgrounds()),timestamp=now_();
+ const values=range.getDisplayValues(),result=applyConfirmed2027_(parse2027Timetable_(values,range.getBackgrounds()),values,readConfirmed2027_()),timestamp=now_();
  if(!result.classes.length)throw Error('2027 정규 수업을 읽지 못했습니다. 원본 배치를 확인하세요.');
  ensure2027Tables_();
  write_('2027반설정',result.classes.map(c=>({...c,review:String(c.review),issues:c.issues.join('\n'),updatedAt:timestamp,resources:JSON.stringify((c.parts||[c]).map(x=>({day:x.day,start:x.start,end:(x.issues||[]).some(issue=>/시작·종료 시간 확인|수업 시간 영역 확인/.test(issue))?'':x.end,room:x.room,teacher:x.teacher})))})));
@@ -124,14 +131,14 @@ function sync2027Timetable_(){
 }
 function read2027Snapshot_(){
  Object.assign(TABLES_,YEAR2027_TABLES_);const timestamp=props_().getProperty('YEAR2027_LAST_SYNC');if(!timestamp)throw Error('2027 시간표를 동기화한 뒤 신청할 수 있습니다.');
- const rows=read_('2027반설정');if(!rows.length||rows.some(c=>c.updatedAt!==timestamp))throw Error('2027 시간표 동기화 상태를 확인 중입니다.');
+ const rows=read_('2027반설정').filter(c=>!excludedWeekendRoom2027(c));if(!rows.length||rows.some(c=>c.updatedAt!==timestamp))throw Error('2027 시간표 동기화 상태를 확인 중입니다.');
  const stale=catalogStale_(timestamp);
  return {updatedAt:timestamp,classes:rows.map(c=>({...c,capacity:Number(c.capacity),registered:Number(c.registered),remaining:stale?0:Number(c.remaining),review:stale||c.review!=='false'}))};
 }
 function public2027Catalog_(){
  const p=props_();if(!p.getProperty('PRIVACY_CONTACT'))throw Error('상담 연락처를 준비 중입니다.');
  const snapshot=read2027Snapshot_();
- return {year:2027,mode:'live',updatedAt:snapshot.updatedAt,classes:snapshot.classes.filter(c=>c.grade).map(c=>({id:c.id,grade:c.grade,title:c.title,day:c.day,start:c.start,end:c.end,room:c.room,capacity:c.capacity,remaining:c.review?0:c.remaining,review:c.review})),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT'),sourceTitle:'2027 예상'};
+ return {year:2027,mode:'live',updatedAt:snapshot.updatedAt,classes:bundleWinter2027(snapshot.classes.filter(c=>c.grade)).map(c=>({id:c.id,grade:c.grade,title:c.title,day:c.day,start:c.start,end:c.end,room:c.room,capacity:c.capacity,remaining:c.review?0:c.remaining,review:c.review,...(c.bundle?{bundle:true,days:c.days,sessions:c.sessions}:{})})),retentionDays:Number(p.getProperty('RETENTION_DAYS')||90),privacyContact:p.getProperty('PRIVACY_CONTACT'),sourceTitle:'2027 1~2월'};
 }
 // Use the private 2027 snapshot only; never send teacher resources to the browser.
 function opening2027Catalog_(){
@@ -143,8 +150,8 @@ function opening2027Catalog_(){
  }catch(error){console.error('2027 opening slots unavailable: '+error.message);return {slots:[],openingYear:2027,openingSemester:1,openingUpdatedAt:'',openingError:'2027 시간표 확인 후 개설 가능 시간을 표시합니다. 관리자에게 동기화를 요청해 주세요.'};}
 }
 function cached2027Catalog_(){
- let cache;try{cache=CacheService.getScriptCache();const raw=cache.get('public-2027-v1');if(raw){const v=JSON.parse(raw);if(!catalogStale_(v.updatedAt))return v;}}catch(e){}
- return locked_(()=>{const value=public2027Catalog_();if(cache)try{cache.put('public-2027-v1',JSON.stringify(value),60);}catch(e){}return value;});
+ let cache;try{cache=CacheService.getScriptCache();const raw=cache.get('public-2027-v2');if(raw){const v=JSON.parse(raw);if(!catalogStale_(v.updatedAt))return v;}}catch(e){}
+ return locked_(()=>{const value=public2027Catalog_();if(cache)try{cache.put('public-2027-v2',JSON.stringify(value),60);}catch(e){}return value;});
 }
 function admin2027Snapshot_(){
  try{const snapshot=read2027Snapshot_();return {upcoming:snapshot.classes,upcomingReviews:read_('2027확인필요'),upcomingLastSync:snapshot.updatedAt};}catch(error){return {upcoming:[],upcomingReviews:[],upcomingLastSync:'',upcomingError:error.message};}
@@ -152,4 +159,96 @@ function admin2027Snapshot_(){
 function syncAllTimetables_(){
  const results={},errors=[];try{results.current=syncTimetable_();}catch(e){errors.push('현재 시간표: '+e.message);}try{results.year2027=sync2027Timetable_();}catch(e){errors.push('2027 시간표: '+e.message);}
  if(errors.length)throw Error(errors.join('\n'));return results;
+}
+
+// Confirmed corrections remain in the private operations sheet across six-hour refreshes.
+const YEAR2027_CONFIRM_HEADERS_=['enabled','id','sourceCells','grade','title','day','start','end','room','teacher','rosterRanges','public','anchorPattern','issues'];
+function readConfirmed2027_(){
+ const sheet=db_().getSheetByName('2027확정수업');if(!sheet||sheet.getLastRow()<2)return [];
+ if(sheet.getLastRow()>101)throw Error('2027확정수업은 최대 100개까지 읽습니다.');
+ const rows=sheet.getRange(1,1,sheet.getLastRow(),YEAR2027_CONFIRM_HEADERS_.length).getDisplayValues();
+ if(!YEAR2027_CONFIRM_HEADERS_.every((h,i)=>rows[0][i]===h))throw Error('2027확정수업 열 제목을 확인하세요.');
+ return rows.slice(1).filter(r=>r[0]==='true'||r[0]==='TRUE').map(row=>Object.fromEntries(YEAR2027_CONFIRM_HEADERS_.map((h,i)=>[h,row[i]])));
+}
+function applyConfirmed2027_(result,values,confirmed){
+ if(!confirmed.length)return result;
+ let classes=result.classes.filter(c=>!excludedWeekendRoom2027(c));const claimed=new Set();
+ const cell=ref=>{const m=String(ref).match(/^([A-W])([1-9]\d?)$/);if(!m)throw Error('2027 확정 수업의 셀 주소를 확인하세요: '+ref);return {row:Number(m[2])-1,col:m[1].charCodeAt(0)-65};};
+ for(const spec of confirmed){
+  if(excludedWeekendRoom2027(spec))continue;
+  const ids=String(spec.sourceCells).split(',').map(x=>x.trim());if(!ids.length||ids.some(id=>claimed.has(id)))throw Error('확정 수업의 원본 셀이 중복됩니다.');ids.forEach(id=>claimed.add(id));
+  const anchor=cell(ids[0]),text=String(values[anchor.row]?.[anchor.col]||'');
+  const issues=String(spec.issues||'').split('\n').filter(Boolean);
+  if(!spec.anchorPattern||!new RegExp(spec.anchorPattern).test(text))issues.push('원본 제목 변경: 확정 수업 연결 확인 필요');
+  if(!/^[월화수목금토일]$/.test(spec.day)||!/^\d+교실$/.test(spec.room)||!/^([01]\d|2[01]):[03]0$/.test(spec.start)||!/^([01]\d|2[0-2]):[03]0$/.test(spec.end)||spec.end>'22:00'||spec.start>=spec.end)issues.push('확정 수업 요일·시간·교실 확인 필요');
+  if(spec.public!=='false'&&!/^(초[1-6]|중[1-3]|고[12])$/.test(spec.grade))issues.push('확정 수업 학년 확인 필요');
+  const names=[],seen=new Set();
+  for(const range of String(spec.rosterRanges||'').split(';').filter(Boolean)){
+   const [a,b=a]=range.split(':'),first=cell(a),last=cell(b);
+   if(first.col!==last.col||first.row>last.row)throw Error('확정 원생 범위는 같은 열의 연속 셀로 지정하세요.');
+   for(let row=first.row;row<=last.row;row++){
+    const raw=String(values[row]?.[first.col]||'');if(headingYear2027_(raw).header){issues.push('원생 범위에 수업 제목 포함: '+a1Year2027_(row,first.col));continue;}
+    const parsed=namesYear2027_(raw);issues.push(...parsed.issues);
+    for(const name of parsed.names)if(!seen.has(name)){seen.add(name);names.push({name,sourceCell:a1Year2027_(row,first.col)});}
+   }
+  }
+  classes=classes.filter(c=>!String(c.sourceCell).split('+').some(id=>ids.includes(id)));
+  classes.push({id:'y2027-'+spec.id,sourceCell:ids.join('+'),grade:spec.public==='false'?'':spec.grade,title:spec.title,day:spec.day,start:spec.start,end:spec.end,room:spec.room,teacher:spec.teacher,header:text,names,issues,confirmed:true});
+ }
+ for(const c of classes){
+  c.issues=(c.issues||[]).filter(x=>x!=='동일 교실 수업 시간 겹침 확인 필요');
+  c.capacity=classCapacity(c);c.registered=new Set(c.names.map(x=>x.name)).size;c.remaining=Math.max(0,c.capacity-c.registered);
+  if(c.registered>c.capacity)c.issues.push('확정 등록 인원이 정원 초과');
+  if(classes.some(x=>x!==c&&(x.parts||[x]).some(a=>(c.parts||[c]).some(b=>a.day===b.day&&a.room===b.room&&a.start<b.end&&b.start<a.end))))c.issues.push('동일 교실 수업 시간 겹침 확인 필요');
+  if(classes.some(x=>x!==c&&(x.parts||[x]).some(a=>(c.parts||[c]).some(b=>a.teacher&&a.teacher===b.teacher&&a.day===b.day&&a.start<b.end&&b.start<a.end))))c.issues.push('동일 강사 수업 시간 겹침 확인 필요');
+  c.issues=[...new Set(c.issues)];c.review=c.issues.length>0;
+ }
+ return {...result,classes,roster:classes.flatMap(c=>c.names.map(p=>({classId:c.id,name:p.name,status:'registered',sourceCell:p.sourceCell}))),reviews:classes.flatMap(c=>c.issues.map(issue=>({sourceCell:c.sourceCell,day:c.day,start:c.start,end:c.end,room:c.room,header:c.header,issue})))};
+}
+
+// Shared with public/winter-courses.js; checked by regression tests.
+// Public course rules; no teacher or student records belong here.
+function winter2027Course(c){
+  if(!c||!/겨울방학|네비게이터/.test(c.title||''))return null;
+  const middle=['y2027-F5','y2027-U5','winter2027-middle'].includes(c.id);
+  const high=['y2027-M5','y2027-F51','winter2027-high'].includes(c.id);
+  if(!middle&&!high)return null;
+  const pairs=middle?[[2026,'초6','중1'],[2027,'중1','중1']]:[[2026,'중2','중3'],[2026,'중3','고1'],[2027,'중3','중3'],[2027,'고1','고1']];
+  return {key:middle?'middle':'high',title:middle?'중등 네비게이터':'고등 네비게이터',
+    audience:middle?'2026년 초6 · 2027년 중1':'2026년 중2·중3 · 2027년 중3·고1',
+    options:pairs.map(([year,grade,nextGrade])=>({value:year+':'+grade,label:year+'년 '+grade,grade:nextGrade}))};
+}
+function winter2027Grade(c,value){
+  const special=winter2027Course(c);
+  if(!special)return value===c.grade?{grade:value,label:'2027년 '+value}:null;
+  return special.options.find(o=>o.value===value)||null;
+}
+
+function excludedWeekendRoom2027(c){
+  return ['토','일'].includes(c.day)&&/(?:^|[^0-9])2\s*교실(?:$|[^0-9])/.test(String(c.room||''));
+}
+function scheduleKey2027(c){
+  const base=[c.id,c.grade,c.title,c.day,c.start,c.end,c.room];
+  if(c.bundle)base.push(c.sessions.map(s=>[s.id,s.day,s.start,s.end,s.room]));
+  return JSON.stringify(base);
+}
+// A course is available only when both weekly sessions are unambiguous and have seats.
+function bundleWinter2027(classes){
+  const allowed=classes.filter(c=>!excludedWeekendRoom2027(c));
+  const result=allowed.filter(c=>!winter2027Course(c));
+  for(const [key,ids,days] of [['middle',['y2027-F5','y2027-U5'],['월','수']],['high',['y2027-M5','y2027-F51'],['화','목']]]){
+    const sessions=ids.map(id=>allowed.find(c=>c.id===id&&winter2027Course(c)));
+    if(!sessions.some(Boolean))continue;
+    const first=sessions.find(Boolean),profile=winter2027Course(first);
+    const invalid=sessions.some((s,i)=>!s||s.review||s.day!==days[i]||!s.start||s.start>=s.end||s.end>'22:00'||!Number.isFinite(Number(s.capacity))||!Number.isFinite(Number(s.remaining)));
+    const publicSessions=sessions.filter(Boolean).map(s=>({id:s.id,day:s.day,start:s.start,end:s.end,room:s.room}));
+    const capacity=invalid?0:Math.min(...sessions.map(s=>Number(s.capacity)));
+    result.push({id:'winter2027-'+key,grade:key==='middle'?'중1':'중3',title:profile.title+' · 주 2회',day:days.join('·'),days,
+      start:first.start,end:first.end,room:[...new Set(publicSessions.map(s=>s.room))].join(' / '),capacity,
+      remaining:invalid?0:Math.max(0,Math.min(...sessions.map(s=>Number(s.remaining)))),review:invalid,bundle:true,sessions:publicSessions});
+  }
+  return result;
+}
+function scheduleLabel2027(c){
+  return c.bundle?c.sessions.map(s=>s.day+'요일 '+s.start+'–'+s.end).join(' / ')+' · 주 2회':c.day+'요일 '+c.start+'–'+c.end;
 }
