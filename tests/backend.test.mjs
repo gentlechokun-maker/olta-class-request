@@ -67,16 +67,24 @@ test('catalog cache bypasses locks on hits, invalidates, and rejects stale snaps
   r.cachedPublicCatalog_();r.cachedPublicCatalog_();assert.equal(reads,1);assert.equal(locks,1);
   r.invalidateCatalogCache_();r.cachedPublicCatalog_();assert.equal(reads,2);
   stored=JSON.stringify({updatedAt:new Date(Date.now()-401*60000).toISOString()});r.cachedPublicCatalog_();assert.equal(reads,3);
-  assert.equal(r.catalogStale_(new Date(Date.now()-390*60000).toISOString()),false);
-  assert.equal(r.catalogStale_('invalid'),true);
+  const clock=runtime(),noon=Date.parse('2026-10-23T12:00:00+09:00');clock.Date=class extends Date{static now(){return noon;}};
+  assert.equal(clock.catalogStale_(new Date(noon-90*60000).toISOString()),false);
+  assert.equal(clock.catalogStale_(new Date(noon-110*60000).toISOString()),true);
+  assert.equal(clock.catalogStale_('invalid'),true);
+  clock.Date=class extends Date{static now(){return Date.parse('2026-10-23T09:30:00+09:00');}};
+  assert.equal(clock.catalogStale_('2026-10-22T21:30:00+09:00'),false,'overnight pause does not stale the timetable');
   r.CacheService.getScriptCache=()=>{throw Error('cache unavailable');};r.cachedPublicCatalog_();assert.equal(reads,4);
 });
 
-test('trigger installation replaces only timetable and cleanup schedules with four Korean-time runs',()=>{
+test('trigger installation uses one hourly schedule with a night-time guard',()=>{
   const r=runtime(),created=[],deleted=[];r.admin_=()=>true;
-  r.ScriptApp={getProjectTriggers:()=>['scheduledSync_','cleanup_','syncTimetable','unrelated'].map(name=>({getHandlerFunction:()=>name})),deleteTrigger:t=>deleted.push(t.getHandlerFunction()),newTrigger:handler=>{const spec={handler};const builder={};for(const method of ['timeBased','atHour','nearMinute','everyDays','inTimezone'])builder[method]=value=>{spec[method]=value;return builder;};builder.create=()=>created.push(spec);return builder;}};
+  r.ScriptApp={getProjectTriggers:()=>['scheduledSync_','cleanup_','syncTimetable','unrelated'].map(name=>({getHandlerFunction:()=>name})),deleteTrigger:t=>deleted.push(t.getHandlerFunction()),newTrigger:handler=>{const spec={handler};const builder={};for(const method of ['timeBased','atHour','nearMinute','everyDays','everyHours','inTimezone'])builder[method]=value=>{spec[method]=value;return builder;};builder.create=()=>created.push(spec);return builder;}};
   r.installTriggers();assert.deepEqual(deleted,['scheduledSync_','cleanup_','syncTimetable']);
-  assert.deepEqual(created.filter(x=>x.handler==='scheduledSync_').map(x=>x.atHour),[0,6,12,18]);
-  for(const spec of created){assert.equal(spec.inTimezone,'Asia/Seoul');assert.equal(spec.everyDays,1);}
+  assert.deepEqual(created.filter(x=>x.handler==='scheduledSync_').map(x=>x.everyHours),[1]);
+  for(const spec of created)assert.equal(spec.inTimezone,'Asia/Seoul');
+  assert.equal(created.find(x=>x.handler==='cleanup_').everyDays,1);
   assert.equal(created.filter(x=>x.handler==='cleanup_').length,1);
+  let runs=0;r.Utilities={formatDate:()=>String(r.hour)};r.locked_=fn=>fn();r.syncAllTimetables_=()=>{runs++;return {};};r.syncSourceMakeups_=()=>({});
+  for(const hour of [0,8,22,23]){r.hour=hour;assert.equal(r.scheduledSync_().skipped,true);}
+  for(const hour of [9,12,21]){r.hour=hour;r.scheduledSync_();}assert.equal(runs,3);
 });
