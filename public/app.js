@@ -1,4 +1,4 @@
-import {winter2027Course,winter2027Grade,scheduleKey2027,scheduleLabel2027} from './winter-courses.js?v=20261023-bundle';
+import {winter2027Course,winter2027Grade,scheduleKey2027,scheduleLabel2027} from './winter-courses.js?v=20261023-f51';
 import {readPublicData} from './public-data.js?v=20261020-year2027';
 import {GRADES,COURSE_GRADES,courseGrade,gradeLabel,studentGrades,curriculum,classCapacity,normalizePhone,makeupWindow,validateMakeup,openingSlotAvailable} from './domain.js?v=20261021-opening2027';
 import {submitInline} from './submission.js?v=20261020-receipt';
