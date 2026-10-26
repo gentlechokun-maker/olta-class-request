@@ -139,7 +139,7 @@ function renderWinter(){
   grid.innerHTML=groups.map(group=>{const cards=group.keys.map(key=>{
     const sample=all.find(c=>winter2027Course(c).key===key);if(!sample)return '';
     const info=winter2027Course(sample),ready=classes.find(c=>c.id===sample.id);
-    const tagline=key==='middle'?'중학 과학 전반을 한번에 정리하는 수업입니다.':key==='high'?'중학 과학 총정리로 2027년 고1 3월 모의고사를 대비합니다.':key.includes('experiment')?'같은 시간에 해당 두 학년이 함께 듣는 실험 특강입니다.':key.includes('debate')?'표시된 학년이 함께 듣는 토론 특강입니다.':'중3·고1·고2가 함께 듣는 대입 네비게이터 특강입니다.';
+    const tagline=key==='middle'?'중학 과학 전반을 한번에 정리하는 수업입니다.':key==='high'?'중학 과학 총정리로 2027년 고1 3월 모의고사를 대비합니다.':key.includes('experiment')?'같은 시간에 해당 두 학년이 함께 듣는 실험 특강입니다.':key.includes('debate')?(info.options.length===1?'2027년 '+info.options[0].grade+'만 신청할 수 있는 토론 특강입니다.':'초5·초6이 함께 듣는 토론 특강입니다.'):'중3·고1·고2가 함께 듣는 대입 네비게이터 특강입니다.';
     return '<article class="winter-card '+(key==='high'||key.includes('navigator')?'high':'')+'"><span class="winter-chip">'+esc(info.period)+'</span><h3>'+esc(info.title)+'</h3><p class="winter-audience">신청 가능 · '+esc(info.audience)+'</p><p>'+esc(tagline)+'</p><div class="winter-times">'+(ready?'<button type="button" data-request="year2027" data-id="'+esc(ready.id)+'"><span><strong>'+esc(scheduleLabel2027(ready))+'</strong></span><b>'+(ready.bundle?'묶음 신청':'특강 신청')+' ↗</b></button>':'<p>현재 신청 가능한 자리가 없습니다. 학원에 문의해 주세요.</p>')+'</div></article>';
   }).join('');return cards?'<section class="winter-section"><h4>'+group.heading+'</h4><div class="winter-grid">'+cards+'</div></section>':'';}).join('');
 }
