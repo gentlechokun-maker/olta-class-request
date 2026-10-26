@@ -43,7 +43,7 @@ function parseSourceMakeups_(values,colors,rich,classes,palette,sheetId,title){
     const blue=runs.length?runs.map(run=>({text:run.getText(),color:String(run.getTextStyle().getForegroundColor()||base).toLowerCase()})).filter(run=>palette[run.color]==='makeup').map(run=>run.text):palette[base]==='makeup'?[text]:[];
     if(!blue.length)continue;
     const head=blue.join(' ').trim();
-    const names=[...head.matchAll(/(?:^|[\s,;\[])([가-힣]{2,5})(?![가-힣])/g)].map(match=>match[1]).filter(name=>!/^(내신대비|중등과학|고등과학|초등과학|수업내용|보강수업)$/.test(name));
+    const names=[...head.matchAll(/(?:^|[\s,;\[])([가-힣]{2,5})(?![가-힣])/g)].map(match=>match[1]).filter(name=>!/^(내신대비|중등과학|고등과학|초등과학|수업내용|보강수업|한시간|두시간|세시간|삼십분|이론수업|실험수업)$/.test(name));
     if(!names.length)continue;
     const date=sourceMakeupDate_(text,year),clock=/(\d{1,2})시\s*(\d{1,2})?\s*분?/.exec(text);
     const row=r+1,col=c+1,cell=sourceMakeupColumn_(c)+row,sourceCell=title+'!'+cell,day=sourceMakeupDay_(row,col);
