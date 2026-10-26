@@ -57,7 +57,7 @@ function openRequest(kind,id){
   form.elements.absenceDate.max=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
   form.elements.date.min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
   $('#demo-form-note').hidden=catalog.mode!=='demo';$('#form-status').textContent='';form.querySelector('[type=submit]').disabled=false;
-  form.querySelector('.form-note').textContent=special?special.period+' 운영 · '+(target.bundle?'두 요일을 함께 듣는 묶음 과정입니다. ':'')+'학원 확인 후 등록을 확정하며, 신청만으로 자리가 확보되지는 않습니다.':kind==='year2027'?'2027년 예상 시간표의 정규 수업 신청입니다. 보호자가 신청해 주세요. 상담 후 일정과 수강 등록을 확정하며, 신청만으로 자리가 확보되지는 않습니다.':kind==='makeup'?'보호자가 신청해 주세요. 신청만으로 보강이 확정되지 않으며, 결석 수업 내용과 재원 여부, 선생님·교실 일정을 확인한 뒤 연락드립니다.':'보호자가 신청해 주세요. 신청 후 상담을 거쳐 등록하며, 신청 시 자리가 확보되지는 않습니다.';
+  form.querySelector('.form-note').textContent=special?special.period+' 운영 · '+(target.bundle?'두 요일이 하나의 묶음 과정입니다. ':'')+'학원 확인 후 등록을 확정하며, 신청만으로 자리가 확보되지는 않습니다.':kind==='year2027'?'2027년 예상 시간표의 정규 수업 신청입니다. 보호자가 신청해 주세요. 상담 후 일정과 수강 등록을 확정하며, 신청만으로 자리가 확보되지는 않습니다.':kind==='makeup'?'보호자가 신청해 주세요. 신청만으로 보강이 확정되지 않으며, 결석 수업 내용과 재원 여부, 선생님·교실 일정을 확인한 뒤 연락드립니다.':'보호자가 신청해 주세요. 신청 후 상담을 거쳐 등록하며, 신청 시 자리가 확보되지는 않습니다.';
   form.querySelector('[type=submit]').textContent=catalog.mode==='demo'?'예시 신청 흐름 확인':special?'겨울방학 특강 신청하기 ↗':kind==='makeup'?'보강 상담 요청하기 ↗':'상담 연락 요청하기 ↗';
   if(kind==='makeup')updateMakeupTime();$('#request-dialog').showModal();
 }
@@ -139,7 +139,7 @@ function renderWinter(){
   grid.innerHTML=groups.map(group=>{const cards=group.keys.map(key=>{
     const sample=all.find(c=>winter2027Course(c).key===key);if(!sample)return '';
     const info=winter2027Course(sample),ready=classes.find(c=>c.id===sample.id);
-    const tagline=key==='middle'?'중학 과학 전반을 한번에 정리하는 수업입니다.':key==='high'?'중학 과학 총정리로 2027년 고1 3월 모의고사를 대비합니다.':key.includes('experiment')?'같은 시간에 해당 두 학년이 함께 듣는 실험 특강입니다.':key.includes('debate')?(info.options.length===1?'2027년 '+info.options[0].grade+'만 신청할 수 있는 토론 특강입니다.':'초5·초6이 함께 듣는 토론 특강입니다.'):'중3·고1·고2가 함께 듣는 대입 네비게이터 특강입니다.';
+    const tagline=key==='middle'?'중학 과학 전반을 한번에 정리하는 수업입니다.':key==='high'?'중학 과학 총정리로 2027년 고1 3월 모의고사를 대비합니다.':key.includes('experiment')?'직접 탐구하는 올치 실험 특강입니다.':key.includes('debate')?(info.options.length===1?'2027년 '+info.options[0].grade+'만 신청할 수 있는 토론 특강입니다.':'생각을 말로 풀어보는 올치 토론 특강입니다.'):'대입 준비를 위한 네비게이터 특강입니다.';
     return '<article class="winter-card '+(key==='high'||key.includes('navigator')?'high':'')+'"><span class="winter-chip">'+esc(info.period)+'</span><h3>'+esc(info.title)+'</h3><p class="winter-audience">신청 가능 · '+esc(info.audience)+'</p><p>'+esc(tagline)+'</p><div class="winter-times">'+(ready?'<button type="button" data-request="year2027" data-id="'+esc(ready.id)+'"><span><strong>'+esc(scheduleLabel2027(ready))+'</strong></span><b>'+(ready.bundle?'묶음 신청':'특강 신청')+' ↗</b></button>':'<p>현재 신청 가능한 자리가 없습니다. 학원에 문의해 주세요.</p>')+'</div></article>';
   }).join('');return cards?'<section class="winter-section"><h4>'+group.heading+'</h4><div class="winter-grid">'+cards+'</div></section>':'';}).join('');
 }
