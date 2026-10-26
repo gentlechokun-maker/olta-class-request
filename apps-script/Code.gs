@@ -12,7 +12,7 @@ const TABLES_ = {
   '휴원연락':['classId','student','pauseStart','pauseEnd','followUp','contactedAt','note'],
   '감사':['time','actor','action','recordId']
 };
-function onOpen(){SpreadsheetApp.getUi().createMenu('올타 상담 앱').addItem('처음 설정','setup').addItem('관리 화면','openAdmin').addItem('설명회·방문상담·결석보강','openBookingAdmin').addItem('예약 기능·2026 달력 설정','setupBookings').addItem('시간표 동기화','syncTimetable').addItem('운영 시간 매시간 동기화 설치','installTriggers').addToUi();}
+function onOpen(){SpreadsheetApp.getUi().createMenu('올타 상담 앱').addItem('처음 설정','setup').addItem('통합 관리 화면','openAdmin').addItem('예약 기능·2026 달력 설정','setupBookings').addItem('시간표 동기화','syncTimetable').addItem('운영 시간 매시간 동기화 설치','installTriggers').addToUi();}
 function props_(){return PropertiesService.getScriptProperties();}
 let DB_HANDLE_=null;
 function db_(){if(DB_HANDLE_)return DB_HANDLE_;const id=props_().getProperty('DB_ID');if(!id)throw new Error('운영 저장소 설정이 필요합니다.');DB_HANDLE_=SpreadsheetApp.openById(id);return DB_HANDLE_;}
@@ -55,6 +55,7 @@ function configIssues_(rows){
 }
 function classKey_(c){return JSON.stringify([c.id,c.grade,c.title,c.day,c.start,c.end,c.room,c.sourceRange,semester_()]);}
 function syncTimetable(){admin_();return locked_(()=>{const result=syncAllTimetables_();result.sourceMakeups=syncSourceMakeups_();return result;});}
+function syncSourceMakeupsAdmin(){admin_();return locked_(()=>syncSourceMakeups_());}
 function scheduledSync_(){const hour=Number(Utilities.formatDate(new Date(),'Asia/Seoul','H'));if(hour<9||hour>=22)return {skipped:true};return locked_(()=>{const result=syncAllTimetables_();result.sourceMakeups=syncSourceMakeups_();return result;});}
 function syncTimetable_(){
   const sourceId=props_().getProperty('SOURCE_SPREADSHEET_ID'),sheetId=Number(props_().getProperty('SOURCE_SHEET_ID'));
