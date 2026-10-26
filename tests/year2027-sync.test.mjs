@@ -66,3 +66,46 @@ test('a dated regular-class heading is reviewed rather than silently treated as 
  const r=runtime(),f=fixture();f.block(13,3,4,'신T 초4 10/24 시작',['가학생']);
  const result=r.parse2027Timetable_(f.values,f.backgrounds);assert.equal(result.classes.length,1);assert.equal(result.ignored.dated,0);assert.equal(result.classes[0].review,true);assert.match(result.classes[0].issues.join(' '),/정규반/);
 });
+
+test('2027 middle-two school labels follow the requested weekday groups and never expose teachers',()=>{
+ const r=runtime(),f=fixture();f.block(25,21,8,'중2 서원',['가학생']);f.block(67,15,8,'중2 이현 성서',['나학생']);f.block(64,19,8,'중2소현정평서원',['다학생매주지각 라학생','소현중1']);
+ const result=r.parse2027Timetable_(f.values,f.backgrounds),at=cell=>result.classes.find(c=>c.sourceCell===cell);
+ assert.equal(at('U25').title,'니들 · 학교: 서원');assert.equal(at('O67').title,'니들 · 학교: 이현·성서');assert.equal(at('S64').title,'니들 · 학교: 소현·서원·정평');
+ assert.equal(at('S64').registered,2);assert.equal(at('S64').review,false);assert.deepEqual(Array.from(at('S64').names,n=>n.name),['다학생','라학생']);
+});
+test('known attendance annotations and explicit school grades are metadata, while unfamiliar notes still require review',()=>{
+ const r=runtime(),parsed=r.namesYear2027_('가학생매주지각 나학생 소현중1 서원중2');assert.deepEqual(Array.from(parsed.names),['가학생','나학생']);assert.equal(parsed.issues.length,0);
+ assert.ok(r.namesYear2027_('가학생확인해야함').issues.length>0);
+});
+
+test('weekend room two blocks are skipped at the source and never restore rosters on refresh',()=>{
+ const r=runtime(),f=fixture();f.values[45][16]='2교실';f.values[45][21]='2교실';
+ f.block(52,17,4,'홍T 초3',['제외학생']);f.block(52,22,4,'홍T 초3',['제외학생']);f.block(13,3,4,'홍T 초3',['유지학생']);
+ const result=r.parse2027Timetable_(f.values,f.backgrounds);
+ assert.equal(result.classes.length,1);assert.equal(result.classes[0].day,'월');assert.ok(!JSON.stringify(result.roster).includes('제외학생'));
+ const override={enabled:'true',id:'Q52',sourceCells:'Q52',grade:'초3',title:'아톰1',day:'토',start:'10:00',end:'11:00',room:'2교실',teacher:'홍T',rosterRanges:'Q53',public:'true',anchorPattern:'초3',issues:''};
+ assert.equal(r.applyConfirmed2027_(result,f.values,[override]).classes.length,1);
+});
+
+test('confirmed winter timetable anchors create eight bookable specials and reject a changed period',()=>{
+ const r=runtime(),f=fixture();
+ for(const [cell,heading] of [
+  ['F17','신T 3 올치토론 특강(1,2월)'],['L17','신T 4 올치토론 특강(1,2월)'],
+  ['M63','신T5, 6 올치토론 특강(1,2월)'],['N71','고2 (대입네비게이터특강1)'],
+  ['N83','고2 (대입네비게이터특강2)'],['L13','올치실험특강 초1 초2(1월)'],
+  ['T13','올치실험특강 초3 초4(1월)'],['E59','올치실험특강 초5 초6(1월)']
+ ]){const col=cell.charCodeAt(0)-65,row=Number(cell.slice(1))-1;f.values[row][col]=heading;}
+ for(const [row,label] of [[72,'통합과학1'],[73,'EBS개념완성1'],[84,'통합과학2'],[85,'EBS개념완성2']])f.values[row-1][13]=label;
+ const result=r.parse2027Timetable_(f.values,f.backgrounds),specials=result.classes.filter(c=>c.id.startsWith('special2027-'));
+ assert.equal(specials.length,8);assert.ok(specials.every(c=>!c.review));
+ assert.ok(!result.classes.some(c=>['N72','N73','N84','N85'].includes(c.sourceCell)));
+ assert.deepEqual(JSON.parse(JSON.stringify(specials.map(c=>[c.sourceCell,c.day,c.start,c.end]))),[
+  ['F17','월','14:00','17:00'],['L17','화','14:00','17:00'],['M63','금','14:00','17:00'],
+  ['N71','금','16:00','19:00'],['N83','금','19:00','21:00'],['L13','화','13:00','14:00'],
+  ['T13','수','13:00','14:00'],['E59','목','13:00','14:00']
+ ]);
+ assert.ok(result.ignored.special>=8);assert.equal(result.roster.length,0);
+ f.values[12][11]='올치실험특강 초1 초2(2월)';
+ const changed=r.parse2027Timetable_(f.values,f.backgrounds).classes.find(c=>c.id==='special2027-experiment-12');
+ assert.equal(changed.review,true);assert.equal(changed.remaining,6);assert.match(changed.issues.join(' '),/운영 기간/);
+});
