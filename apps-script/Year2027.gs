@@ -12,7 +12,7 @@ function headingYear2027_(text){
  const grade=s.match(/(?:^|[\s(\[·])((?:초[1-6]|중[1-3]|고[1-3]))(?=$|[\s)·]|[가-힣])/);
  const teacher=s.match(/([가-힣]{1,4})\s*[Tt](?=$|[\s(·])/);
  const excluded=/보강|직보|클리닉|회의/.test(s);
- const course=s.match(/통합과학|물리학\s*1|물리|화학|실험|이론|빅뱅|아톰\s*[12]?|퀀텀\s*[12]?|니들|스레드|네비게이터|내신대비|세페이드|셀파/);
+ const course=s.match(/올치\s*(?:토론|실험|창의력)\s*특강|통합과학|물리학\s*1|물리|화학|실험|이론|빅뱅|아톰\s*[12]?|퀀텀\s*[12]?|니들|스레드|네비게이터|내신대비|세페이드|셀파/);
  return {s,grade:grade?grade[1]:'',teacher:teacher?teacher[1]+'T':'',course:course?course[0]:'',excluded,header:!!(grade||teacher||course||excluded)};
 }
 function namesYear2027_(text){
@@ -51,6 +51,9 @@ function parse2027Timetable_(values,backgrounds){
      const startRow=r,color=bg(r,col);let stop=r+1;
      while(stop<endBand&&(!headingYear2027_(get(stop,col)).header||get(stop,col)===h.course)&&bg(stop,col)===color)stop++;
      r=stop;
+     // These winter courses have explicit multi-grade and month rules below.
+     if(/올치\s*(?:토론|실험|창의력)\s*특강|대입\s*네비게이터\s*특강/.test(h.s)||
+        (col===13&&[72,73,84,85].includes(startRow+1)&&/^(?:통합과학|EBS개념완성)\s*[12]$/.test(h.s))){ignored.special++;continue;}
      const startMinute=timeAt(startRow),endMinute=timeAt(stop);
      const c={id:'y2027-'+a1Year2027_(startRow,col),sourceCell:a1Year2027_(startRow,col),grade:h.grade,day:day.day,room,teacher:h.teacher,header:h.s,start:startMinute===null?'':minuteYear2027_(startMinute),end:endMinute===null?'':minuteYear2027_(endMinute),title:'',names:[],issues:[],column:col,segment:h.course};
      // Dated one-off entries, including undated continuation lines in that block, never form a regular class.
@@ -93,6 +96,28 @@ function parse2027Timetable_(values,backgrounds){
    c.issues.push('초6 실험·이론 연계반 확인 필요');
   }
   combined.push(c);
+ }
+ // User-confirmed winter offerings are tied to source cells. A changed or missing
+ // heading stays in the private review list rather than becoming bookable.
+ const winterSpecs=[
+  ['special2027-debate-3','F17','초3','초3 올치 토론 특강','월','14:00','17:00',/3\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
+  ['special2027-debate-4','L17','초4','초4 올치 토론 특강','화','14:00','17:00',/4\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
+  ['special2027-debate-56','M63','초5','초5·초6 올치 토론 특강','금','14:00','17:00',/5\s*,\s*6\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
+  ['special2027-navigator-1','N71','중3','대입 네비게이터 특강 1','금','16:00','19:00',/대입\s*네비게이터\s*특강\s*1/,null],
+  ['special2027-navigator-2','N83','중3','대입 네비게이터 특강 2','금','19:00','21:00',/대입\s*네비게이터\s*특강\s*2/,null],
+  ['special2027-experiment-12','L13','초1','초1·초2 올치 실험 특강','화','13:00','14:00',/올치\s*실험\s*특강\s*초1\s*초2/,/\(1월\)/],
+  ['special2027-experiment-34','T13','초3','초3·초4 올치 실험 특강','수','13:00','14:00',/올치\s*실험\s*특강\s*초3\s*초4/,/\(1월\)/],
+  ['special2027-experiment-56','E59','초5','초5·초6 올치 실험 특강','목','13:00','14:00',/올치\s*실험\s*특강\s*초5\s*초6/,/\(1월\)/]
+ ];
+ for(const [id,sourceCell,grade,title,day,start,end,titlePattern,periodPattern] of winterSpecs){
+  const match=sourceCell.match(/^([A-W])(\d+)$/),col=match[1].charCodeAt(0)-65,row=Number(match[2])-1;
+  const band=row<dayRows[1].r?dayRows[0]:dayRows[1],room=get(band.r+1,col),header=get(row,col);
+  if(!header)continue;
+  const daySlot=band.days.find((d,i)=>col>=d.col&&col<(band.days[i+1]?.col||23));
+  const issues=[];
+  if(!titlePattern.test(header)||(periodPattern&&!periodPattern.test(header)))issues.push('원본 특강 제목·운영 기간 확인 필요');
+  if(daySlot?.day!==day||!/^\d+교실$/.test(room))issues.push('특강 요일·교실 확인 필요');
+  combined.push({id,sourceCell,grade,title,day,start,end,room,teacher:headingYear2027_(header).teacher,header,names:[],issues});
  }
  for(const c of combined){
   c.capacity=classCapacity(c);c.registered=new Set(c.names.map(p=>p.name)).size;c.remaining=Math.max(0,c.capacity-c.registered);
@@ -209,12 +234,25 @@ function applyConfirmed2027_(result,values,confirmed){
 // Shared with public/winter-courses.js; checked by regression tests.
 // Public course rules; no teacher or student records belong here.
 function winter2027Course(c){
+  const specials={
+    'special2027-debate-3':{title:'초3 올치 토론 특강',period:'2027년 1~2월',grades:['초3']},
+    'special2027-debate-4':{title:'초4 올치 토론 특강',period:'2027년 1~2월',grades:['초4']},
+    'special2027-debate-56':{title:'초5·초6 올치 토론 특강',period:'2027년 1~2월',grades:['초5','초6']},
+    'special2027-navigator-1':{title:'대입 네비게이터 특강 1',period:'2027년 1~2월',grades:['중3','고1','고2']},
+    'special2027-navigator-2':{title:'대입 네비게이터 특강 2',period:'2027년 1~2월',grades:['중3','고1','고2']},
+    'special2027-experiment-12':{title:'초1·초2 올치 실험 특강',period:'2027년 1월',grades:['초1','초2']},
+    'special2027-experiment-34':{title:'초3·초4 올치 실험 특강',period:'2027년 1월',grades:['초3','초4']},
+    'special2027-experiment-56':{title:'초5·초6 올치 실험 특강',period:'2027년 1월',grades:['초5','초6']}
+  };
+  const extra=specials[c?.id];
+  if(extra)return {key:c.id,title:extra.title,period:extra.period,audience:'2027년 '+extra.grades.join('·'),
+    options:extra.grades.map(grade=>({value:'2027:'+grade,label:'2027년 '+grade,grade}))};
   if(!c||!/겨울방학|네비게이터/.test(c.title||''))return null;
   const middle=['y2027-F5','y2027-U5','winter2027-middle'].includes(c.id);
   const high=['y2027-M5','y2027-F51','winter2027-high'].includes(c.id);
   if(!middle&&!high)return null;
   const pairs=middle?[[2026,'초6','중1'],[2027,'중1','중1']]:[[2026,'중2','중3'],[2026,'중3','고1'],[2027,'중3','중3'],[2027,'고1','고1']];
-  return {key:middle?'middle':'high',title:middle?'중등 네비게이터':'고등 네비게이터',
+  return {key:middle?'middle':'high',title:middle?'중등 네비게이터':'고등 네비게이터',period:'2027년 1~2월',
     audience:middle?'2026년 초6 · 2027년 중1':'2026년 중2·중3 · 2027년 중3·고1',
     options:pairs.map(([year,grade,nextGrade])=>({value:year+':'+grade,label:year+'년 '+grade,grade:nextGrade}))};
 }
@@ -230,12 +268,13 @@ function excludedWeekendRoom2027(c){
 function scheduleKey2027(c){
   const base=[c.id,c.grade,c.title,c.day,c.start,c.end,c.room];
   if(c.bundle)base.push(c.sessions.map(s=>[s.id,s.day,s.start,s.end,s.room]));
+  if(winter2027Course(c))base.push(winter2027Course(c).period);
   return JSON.stringify(base);
 }
 // A course is available only when both weekly sessions are unambiguous and have seats.
 function bundleWinter2027(classes){
   const allowed=classes.filter(c=>!excludedWeekendRoom2027(c));
-  const result=allowed.filter(c=>!winter2027Course(c));
+  const result=allowed.filter(c=>!['middle','high'].includes(winter2027Course(c)?.key));
   for(const [key,ids,days] of [['middle',['y2027-F5','y2027-U5'],['월','수']],['high',['y2027-M5','y2027-F51'],['화','목']]]){
     const sessions=ids.map(id=>allowed.find(c=>c.id===id&&winter2027Course(c)));
     if(!sessions.some(Boolean))continue;

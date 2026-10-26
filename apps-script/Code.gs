@@ -215,7 +215,7 @@ function validate2027_(input){
   if(input.privacyVersion!=='2026-10-13')throw new Error('신청 화면을 새로고침해 주세요.');
   if(!/^[a-zA-Z0-9-]{16,64}$/.test(requestId))throw new Error('신청 화면을 다시 열어 주세요.');
   if(note.length>300)throw new Error('참고 내용은 300자 이내로 입력해 주세요.');
-  return {kind:'year2027',targetId:target.id,student,phone,grade:selection.grade,note:'[접수 당시 수업] '+[target.grade,target.title,scheduleLabel2027(target),target.room].join(' · ')+(winter2027Course(target)?'\n[겨울방학 특강] '+winter2027Course(target).title+' · 선택 학년: '+selection.label+' · 2027년 기준: '+selection.grade:'')+(note?'\n'+note:''),requestId};
+  return {kind:'year2027',targetId:target.id,student,phone,grade:selection.grade,note:'[접수 당시 수업] '+[target.grade,target.title,scheduleLabel2027(target),target.room].join(' · ')+(winter2027Course(target)?'\n[겨울방학 특강] '+winter2027Course(target).title+' · 운영 기간: '+winter2027Course(target).period+' · 선택 학년: '+selection.label+' · 2027년 기준: '+selection.grade:'')+(note?'\n'+note:''),requestId};
 }
 function submit2027_(input){
   public2027Catalog_();
