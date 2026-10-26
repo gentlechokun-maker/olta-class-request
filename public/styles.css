@@ -53,6 +53,7 @@
 
 /* Each winter course has one two-day registration action. */
 .winter-times{grid-template-columns:1fr}.winter-times button>span{display:grid;gap:3px}.winter-times button strong{margin:0}.upcoming-card h3{line-height:1.6}
+.winter-section{margin:20px 0 30px}.winter-section h4{font-size:18px;color:var(--brand-dark);margin:0 0 4px}.winter-section .winter-grid{margin-top:12px}.winter-card .winter-chip{display:inline-block;align-self:flex-start;background:#fff;border-radius:999px;padding:6px 11px}.winter-card .winter-audience{line-height:1.5}
 
 /* Shared brand lockup and orange highlights. */
 .site-header{background:#fff;gap:24px;padding-top:16px;padding-bottom:16px}.site-header .brand-logo{width:76px;height:auto}.site-header .brand-lockup{gap:3px}.site-header nav{gap:22px;flex-wrap:wrap;justify-content:flex-end}.nav-cta{border-color:var(--accent);background:var(--accent-tint);color:var(--accent-ink)}.hero h1 em{background:linear-gradient(transparent 78%,#ffdec5 78%,#ffdec5 94%,transparent 94%)}.eyebrow>span{background:var(--accent)}.winter-badge{color:#542500}.winter-banner-copy>strong span{color:var(--accent)}.winter-times button b{color:var(--accent-ink)}.winter-card p{line-height:1.8}.winter-card{display:flex;flex-direction:column}.winter-times{margin-top:auto;padding-top:18px}.winter-card .winter-audience{margin-bottom:0}.winter-banner:focus-visible{outline-color:var(--brand-dark)}
