@@ -46,5 +46,5 @@ test('retention cleanup removes old review records without removing recent respo
   const {context,tables}=runtime();tables['설명회후기']=[{createdAt:'2026-01-01',eventDate:'2026-01-02'},{createdAt:'2026-10-16',eventDate:'2026-10-15'}];context.cleanupReviews_(Date.parse('2026-07-01'));assert.equal(tables['설명회후기'].length,1);assert.equal(tables['설명회후기'][0].createdAt,'2026-10-16');
 });
 test('review administration script parses and keeps answers escaped',()=>{
-  const html=fs.readFileSync('apps-script/BookingAdmin.html','utf8');for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))assert.doesNotThrow(()=>new vm.Script(match[1]));assert.ok(html.includes("esc(r['answer'+n]||'(미작성)')"));
+  const html=fs.readFileSync('apps-script/Admin.html','utf8');for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))assert.doesNotThrow(()=>new vm.Script(match[1]));assert.ok(html.includes("esc(r['answer'+n]||'(미작성)')"));
 });

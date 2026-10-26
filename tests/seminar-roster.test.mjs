@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 function runtime(){
- const html=fs.readFileSync('apps-script/BookingAdmin.html','utf8');
- const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
- const ctx=vm.createContext({});
- vm.runInContext(script.slice(0,script.indexOf("document.addEventListener")),ctx);
+ const html=fs.readFileSync('apps-script/Admin.html','utf8');
+ const script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+ const start=script.indexOf('(()=>{')+'(()=>{'.length;
+ const ctx=vm.createContext({document:{querySelector:()=>({})}});
+ vm.runInContext(script.slice(start,script.indexOf('function render()',start)),ctx);
  return ctx;
 }
 const row=(id,eventId='first',mode='onsite',status='예약')=>({
