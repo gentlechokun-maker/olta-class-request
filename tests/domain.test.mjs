@@ -13,6 +13,12 @@ test('mixed rich-text cell reads each student, not the cell font',()=>{
   assert.deepEqual(parsed.people.map(p=>p.status),['registered','paused','makeup','consultation','starting']);
   assert.equal(capacity(Object.fromEntries(parsed.people.map(p=>[p.status,1]))).remaining,4);
 });
+test('November orange student text counts as confirmed registration',()=>{
+ const parsed=parseColoredCell('김가람',[{start:0,end:3,color:'#ff9900'}]);
+ assert.equal(parsed.issues.length,0);
+ assert.equal(parsed.people[0].status,'registered');
+ assert.equal(capacity({registered:1}).used,1);
+});
 test('unknown color, mixed name color and notes cannot silently create free seats',()=>{
   assert.equal(parseColoredCell('김가람',[{start:0,end:3,color:'#123456'}]).issues.length,1);
   assert.equal(parseColoredCell('김가람',[{start:0,end:1,color:'#ff0000'},{start:1,end:3,color:'#000000'}]).issues.length,1);
