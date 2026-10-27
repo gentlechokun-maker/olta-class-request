@@ -11,7 +11,48 @@ export function validateSeminar(input,event,rows,now=Date.now()){const r=booking
 export function validateVisit(input,cls,rows,now=Date.now()){const r=bookingIdentity(input);if(!cls||cls.grade!==r.grade||cls.review||cls.remaining<1)throw Error('현재 상담 신청 가능한 반을 선택해 주세요.');const date=bookingDate(input.date),start=String(input.start||'');if(!['월','화','수','목'].includes(bookingDay(date))||!['09:00','09:30','10:00','10:30','11:00','11:30'].includes(start))throw Error('방문 상담은 월~목 09:00~12:00 사이 30분 단위입니다.');if(bookingInstant(date,start)<=now)throw Error('앞으로 방문할 날짜와 시간을 선택해 주세요.');const end=start.endsWith(':00')?start.slice(0,2)+':30':String(Number(start.slice(0,2))+1).padStart(2,'0')+':00';if(rows.some(x=>x.status!=='취소'&&x.date===date&&x.category!==r.category&&start<x.end&&x.start<end))throw Error('해당 시간에는 다른 교육과정 상담이 있습니다. 다른 시간을 선택해 주세요.');return {...r,targetId:cls.id,date,start,end};}
 export function curriculumWeek(date,grade,weeks){bookingDate(date);const rows=weeks.filter(w=>w.date===date&&(w.grade===grade||w.grade==='전체'));const exact=rows.filter(w=>w.grade===grade),selected=exact.length?exact:rows;const keys=[...new Set(selected.map(w=>String(w.weekId||'').trim()).filter(Boolean))];if(keys.length!==1)throw Error('이 날짜의 수업 주차를 학원에서 확인 중입니다.');if(keys[0]==='CLOSED')throw Error('학원 휴원일에는 수업과 보강을 신청할 수 없습니다.');if(keys[0]==='REVIEW')throw Error('이 날짜의 수업 주차를 학원에서 확인 중입니다.');return keys[0];}
 export function absenceWindow(cls,position){if(!['before','after'].includes(position))throw Error('수업 전후를 선택해 주세요.');const minutes=30;const toMin=s=>{if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(s))throw Error('정규 수업 시간을 확인해 주세요.');return Number(s.slice(0,2))*60+Number(s.slice(3));};const start=position==='before'?toMin(cls.start)-minutes:toMin(cls.end),end=start+minutes;if(start<0||end>22*60)throw Error('보강은 오후 10시까지 종료해야 합니다.');const fmt=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');return {start:fmt(start),end:fmt(end),minutes};}
-export function validateAbsence(input,catalog,now=Date.now()){const r=bookingIdentity(input,false),cls=catalog.classes.find(c=>c.id===input.targetId);if(!cls||cls.grade!==r.grade||cls.review)throw Error('정규반의 시간표 확인이 필요합니다.');const absenceDate=bookingDate(input.absenceDate);if(bookingDay(absenceDate)!==cls.day)throw Error('정규 수업 요일에 해당하는 실제 결석일을 선택해 주세요.');const missedTopic='';const base={...r,targetId:cls.id,absenceDate,missedTopic,choice:input.choice};const originalWeek=curriculumWeek(absenceDate,r.grade,catalog.weeks);if(input.absenceWeek&&input.absenceWeek!==originalWeek)throw Error('결석 주차가 날짜와 일치하지 않습니다.');if(['pass','wait'].includes(input.choice))return {...base,date:'',start:'',end:'',makeupClassId:'',weekId:'',absenceWeek:originalWeek};const date=bookingDate(input.date),absenceWeek=curriculumWeek(absenceDate,r.grade,catalog.weeks),weekId=curriculumWeek(date,r.grade,catalog.weeks);if(input.weekId&&input.weekId!==weekId)throw Error('보강 주차가 날짜와 일치하지 않습니다.');if(input.choice==='same'){if(weekId!==absenceWeek)throw Error('동일 수업 주차에만 다른 반에서 보강할 수 있습니다.');const target=catalog.classes.find(c=>c.id===input.makeupClassId);if(!target||target.id===cls.id||target.grade!==r.grade||target.review||bookingDay(date)!==target.day)throw Error('같은 학년의 다른 수업과 해당 요일을 선택해 주세요.');if(target.remaining-(catalog.makeupSeats?.[target.id+'|'+date]||0)<1)throw Error('보강 자리가 마감되었습니다.');if(target.end>'22:00')throw Error('보강은 오후 10시까지 종료해야 합니다.');if(bookingInstant(date,target.start)<=now)throw Error('이미 지난 수업은 신청할 수 없습니다.');return {...base,date,start:target.start,end:target.end,makeupClassId:target.id,absenceWeek,weekId};}if(input.choice!=='adjacent'||weekId===absenceWeek)throw Error('주차가 다르면 정규 수업 전후 보강을 선택해 주세요.');if(bookingDay(date)!==cls.day)throw Error('재원 중인 정규반 수업 요일을 선택해 주세요.');const window=absenceWindow(cls,input.position);if(bookingInstant(date,window.start)<=now)throw Error('이미 지난 보강 시간입니다.');return {...base,date,...window,makeupClassId:cls.id,position:input.position,absenceWeek,weekId};}
+export function makeupPolicy(cls){if(/내신/.test(String(cls?.title||'')))return 'onsite';return /^초[1-6]$/.test(String(cls?.grade||''))?'experiment':'recording';}
+export function experimentWindow(start){if(!/^([01]\d|20):(?:00|30)$/.test(String(start||'')))throw Error('실험 보강 시작 시간을 확인해 주세요.');const minutes=Number(start.slice(0,2))*60+Number(start.slice(3));if(minutes<13*60+30||minutes>20*60)throw Error('실험 보강은 평일 13:30~20:00에 시작할 수 있습니다.');const end=minutes+30;return {start,end:String(Math.floor(end/60)).padStart(2,'0')+':'+String(end%60).padStart(2,'0'),minutes:30};}
+export function validateAbsence(input,catalog,now=Date.now()){
+ const r=bookingIdentity(input,false),cls=catalog.classes.find(c=>c.id===input.targetId);
+ if(!cls||cls.grade!==r.grade||cls.review)throw Error('정규반의 시간표 확인이 필요합니다.');
+ const absenceDate=bookingDate(input.absenceDate);
+ if(bookingDay(absenceDate)!==cls.day)throw Error('정규 수업 요일에 해당하는 실제 결석일을 선택해 주세요.');
+ const base={...r,targetId:cls.id,absenceDate,missedTopic:'',choice:input.choice};
+ const absenceWeek=curriculumWeek(absenceDate,r.grade,catalog.weeks);
+ if(input.absenceWeek&&input.absenceWeek!==absenceWeek)throw Error('결석 주차가 날짜와 일치하지 않습니다.');
+ if(['pass','wait'].includes(input.choice))return {...base,date:'',start:'',end:'',makeupClassId:'',weekId:'',absenceWeek};
+ const policy=makeupPolicy(cls);
+ if(input.choice==='recording'){
+  if(policy!=='recording')throw Error('이 수업은 녹화본 보강 대상이 아닙니다.');
+  return {...base,date:'',start:'',end:'',makeupClassId:'',weekId:'',position:'',absenceWeek};
+ }
+ const date=bookingDate(input.date),weekId=curriculumWeek(date,r.grade,catalog.weeks);
+ if(input.weekId&&input.weekId!==weekId)throw Error('보강 주차가 날짜와 일치하지 않습니다.');
+ if(input.choice==='experiment'){
+  if(policy!=='experiment')throw Error('이 수업은 실험 보강 대상이 아닙니다.');
+  if(date<=absenceDate||!['월','화','수','목','금'].includes(bookingDay(date)))throw Error('실험 보강은 결석일 이후의 월~금 날짜를 선택해 주세요.');
+  const window=experimentWindow(input.position);
+  if(bookingInstant(date,window.start)<=now)throw Error('이미 지난 보강 시간입니다.');
+  return {...base,date,...window,makeupClassId:cls.id,position:window.start,absenceWeek,weekId};
+ }
+ if(input.choice==='same'){
+  if(policy==='recording')throw Error('이론 수업 보강은 녹화본 발송으로 신청해 주세요.');
+  if(date<=absenceDate)throw Error('결석일 이후의 보강 수업을 선택해 주세요.');
+  if(weekId!==absenceWeek)throw Error('동일 수업 주차에만 다른 반에서 보강할 수 있습니다.');
+  const target=catalog.classes.find(c=>c.id===input.makeupClassId);
+  if(!target||target.id===cls.id||target.grade!==r.grade||target.review||bookingDay(date)!==target.day)throw Error('같은 학년의 다른 수업과 해당 요일을 선택해 주세요.');
+  if(target.remaining-(catalog.makeupSeats?.[target.id+'|'+date]||0)<1)throw Error('보강 자리가 마감되었습니다.');
+  if(target.end>'22:00')throw Error('보강은 오후 10시까지 종료해야 합니다.');
+  if(bookingInstant(date,target.start)<=now)throw Error('이미 지난 수업은 신청할 수 없습니다.');
+  return {...base,date,start:target.start,end:target.end,makeupClassId:target.id,absenceWeek,weekId};
+ }
+ if(input.choice!=='adjacent'||policy!=='onsite'||weekId===absenceWeek)throw Error('이 수업의 보강 방법을 다시 선택해 주세요.');
+ if(bookingDay(date)!==cls.day)throw Error('재원 중인 정규반 수업 요일을 선택해 주세요.');
+ const window=absenceWindow(cls,input.position);
+ if(bookingInstant(date,window.start)<=now)throw Error('이미 지난 보강 시간입니다.');
+ return {...base,date,...window,makeupClassId:cls.id,position:input.position,absenceWeek,weekId};
+}
 
 export function weekLabel(id){const m=/^(\d{4})-(\d{2})-W(\d+)$/.exec(String(id||''));return m?m[1]+'년 '+Number(m[2])+'월 '+Number(m[3])+'주차':String(id||'주차 확인 필요');}
 export function academicPeriods(grade,weeks){const result=new Map();for(const date of [...new Set(weeks.map(w=>w.date))].sort()){try{const id=curriculumWeek(date,grade,weeks);if(!/^\d{4}-\d{2}-W\d+$/.test(id))continue;if(!result.has(id))result.set(id,{id,month:id.slice(0,7),label:weekLabel(id),dates:[]});result.get(id).dates.push(date);}catch{}}return [...result.values()].sort((a,b)=>a.id.localeCompare(b.id));}
@@ -36,10 +77,15 @@ export function absenceDates(cls,weeks,now=Date.now()){
  return [...new Set(weeks.map(w=>w.date))].sort().filter(date=>{try{return date>=bookingToday(now)&&bookingDay(date)===cls.day&&bookingInstant(date,cls.start)>now&&/^\d{4}-\d{2}-W\d+$/.test(curriculumWeek(date,cls.grade,weeks));}catch{return false;}});
 }
 export function makeupChoices(cls,absenceDate,date,catalog,now=Date.now()){
- if(!cls||cls.review||date<bookingToday(now))return [];
+ if(!cls||cls.review||date<bookingToday(now)||date<=absenceDate||makeupPolicy(cls)==='recording')return [];
  let original,week;try{original=curriculumWeek(absenceDate,cls.grade,catalog.weeks);week=curriculumWeek(date,cls.grade,catalog.weeks);}catch{return [];}
- if(original===week)return catalog.classes.filter(c=>c.id!==cls.id&&c.grade===cls.grade&&!c.review&&c.day===bookingDay(date)&&c.end<='22:00'&&c.remaining-(catalog.makeupSeats?.[c.id+'|'+date]||0)>0&&bookingInstant(date,c.start)>now).map(c=>({classId:c.id,date,position:'same',start:c.start,end:c.end,title:c.title,room:c.room,choice:'same'}));
- if(bookingDay(date)!==cls.day)return [];
+ const same=original===week?catalog.classes.filter(c=>c.id!==cls.id&&c.grade===cls.grade&&!c.review&&c.day===bookingDay(date)&&c.end<='22:00'&&c.remaining-(catalog.makeupSeats?.[c.id+'|'+date]||0)>0&&bookingInstant(date,c.start)>now).map(c=>({classId:c.id,date,position:'same',start:c.start,end:c.end,title:c.title,room:c.room,choice:'same'})):[];
+ if(makeupPolicy(cls)==='experiment'){
+  if(!['월','화','수','목','금'].includes(bookingDay(date)))return same;
+  const slots=Array.from({length:14},(_,i)=>13*60+30+i*30).map(n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0'));
+  return same.concat(slots.filter(start=>bookingInstant(date,start)>now).map(start=>({classId:cls.id,date,position:start,...experimentWindow(start),choice:'experiment'})));
+ }
+ if(original===week||bookingDay(date)!==cls.day)return same;
  return ['before','after'].flatMap(position=>{try{const w=absenceWindow(cls,position);return bookingInstant(date,w.start)>now?[{classId:cls.id,date,position,...w,choice:'adjacent'}]:[];}catch{return [];}});
 }
 export function validateFutureAbsence(input,cls,now=Date.now()){

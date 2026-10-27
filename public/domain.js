@@ -11,11 +11,11 @@ export function curriculum(grade,day,semester=2){
   if(grade==='중2'||grade==='중3')return {name:'스레드',minutes:180,lesson:'이론 주 1회 · 3시간'};
   return null;
 }
-export function classCurriculum(c,semester=2){if(c.grade==='중3'&&c.title==='중3 내신대비반'||c.grade==='중2'&&c.title==='물리대회 대비반 물리학')return {name:c.title,minutes:120,lesson:'이론 주 1회 · 2시간'};if(c.grade==='중3'&&c.title==='통합과학')return {name:'통합과학',minutes:120,lesson:'이론 주 1회 · 2시간'};return curriculum(c.grade,c.day,semester);}
+export function classCurriculum(c,semester=2){if(/내신/.test(String(c.title||''))||c.grade==='중2'&&c.title==='물리대회 대비반 물리학')return {name:c.title,minutes:120,lesson:'이론 주 1회 · 2시간'};if(c.grade==='중3'&&c.title==='통합과학')return {name:'통합과학',minutes:120,lesson:'이론 주 1회 · 2시간'};return curriculum(c.grade,c.day,semester);}
 export function durationMinutes(start,end){const minutes=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};return minutes(end)-minutes(start);}
 export const STATUS = {registered:'확정 등록',paused:'임시 휴원',makeup:'보강',consultation:'상담 요청',starting:'시작 예정'};
 export const PALETTE = {
-  '#000000':'registered','#ff0000':'paused','#cc0000':'paused','#e06666':'paused',
+  '#000000':'registered','#ff9900':'registered','#ff0000':'paused','#cc0000':'paused','#e06666':'paused',
   '#0000ff':'makeup','#3c78d8':'makeup','#1155cc':'makeup',
   '#008000':'consultation','#00ff00':'consultation','#38761d':'consultation','#6aa84f':'consultation',
   '#800080':'starting','#9900ff':'starting','#a64d79':'starting','#674ea7':'starting','#8e7cc3':'starting'

@@ -1,4 +1,4 @@
-import {bookingIdentity,validateAbsence,validateFutureAbsence,weekLabel} from './booking-domain.js?v=20261021-batch';
+import {bookingIdentity,validateAbsence,validateFutureAbsence,weekLabel} from './booking-domain.js?v=20261027-makeup2';
 
 export function makeupBatchItems(value){
  let items;try{items=typeof value==='string'?JSON.parse(value):value;}catch{throw Error('결석 날짜 목록을 확인해 주세요.');}
@@ -25,5 +25,5 @@ export function validateMakeupBatch(input,catalog,now=Date.now()){
  return checked;
 }
 export function makeupItemSummary(r){
- return r.absenceDate+' · '+weekLabel(r.absenceWeek)+' → '+(r.choice==='pass'?'보강 패스':r.choice==='wait'?'보강 미예약':r.date+' '+r.start+'–'+r.end)+' ['+r.status+']';
+ return r.absenceDate+' · '+weekLabel(r.absenceWeek)+' → '+(r.choice==='pass'?'보강 패스':r.choice==='wait'?'보강 미예약':r.choice==='recording'?'녹화본 발송 요청':r.date+' '+r.start+'–'+r.end)+' ['+r.status+']';
 }
