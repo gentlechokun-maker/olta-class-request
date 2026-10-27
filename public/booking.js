@@ -6,7 +6,7 @@ const $=s=>document.querySelector(s),f=$('#booking-form'),cf=$('#cancel-form'),c
 f.elements.makeupPlan.add(new Option('이론 수업 녹화본 요청','recording'),1);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const params=new URLSearchParams(location.search);
-if(params.get('kind')==='visit'){location.replace(params.get('targetId')?'./?classId='+encodeURIComponent(params.get('targetId'))+'#classes':'./#new');}
+if(params.get('kind')==='visit'){location.replace(params.get('targetId')?'./?classId='+encodeURIComponent(params.get('targetId'))+'#classes':'./#classes');}
 let kind=params.get('kind')||'seminar',catalog=null;
 let receipt=null;try{receipt=JSON.parse(decodeURIComponent(location.hash.slice(1)));if(receipt?.id&&receipt?.token){kind='cancel';const receiptScope=['seminar','visit','absence','consultation'].includes(receipt.kind)?receipt.kind:'seminar';history.replaceState(null,'',location.pathname+'?kind=cancel&bookingKind='+receiptScope);}}catch{}
 if(!['seminar','visit','absence','consultation','cancel'].includes(kind))kind='seminar';

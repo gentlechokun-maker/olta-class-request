@@ -58,3 +58,15 @@
 /* Shared brand lockup and orange highlights. */
 .site-header{background:#fff;gap:24px;padding-top:16px;padding-bottom:16px}.site-header .brand-logo{width:76px;height:auto}.site-header .brand-lockup{gap:3px}.site-header nav{gap:22px;flex-wrap:wrap;justify-content:flex-end}.nav-cta{border-color:var(--accent);background:var(--accent-tint);color:var(--accent-ink)}.hero h1 em{background:linear-gradient(transparent 78%,#ffdec5 78%,#ffdec5 94%,transparent 94%)}.eyebrow>span{background:var(--accent)}.winter-badge{color:#542500}.winter-banner-copy>strong span{color:var(--accent)}.winter-times button b{color:var(--accent-ink)}.winter-card p{line-height:1.8}.winter-card{display:flex;flex-direction:column}.winter-times{margin-top:auto;padding-top:18px}.winter-card .winter-audience{margin-bottom:0}.winter-banner:focus-visible{outline-color:var(--brand-dark)}
 @media(max-width:700px){.site-header .brand-logo{width:54px}.site-header{padding:12px 16px}.site-header nav{gap:10px}.winter-times button{flex-direction:row;align-items:center}.winter-times{padding-top:12px}.winter-banner{background:linear-gradient(115deg,#e8f6ff,#f4faff 60%,#fff0df)}}
+
+/* Public class applications: three shortcuts and the same weekday layout for 2027. */
+.booking-shortcuts{grid-template-columns:repeat(3,minmax(0,1fr))}
+.year2027-filters{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:15px 0}
+.year2027-filters .day-filter{margin-left:auto}
+.opening-class{border-color:#f3a56c;background:#fffaf5}
+.opening-badge{display:inline-block;width:max-content;border-radius:999px;background:#ff7a23;color:#fff;font-size:11px;font-weight:800;letter-spacing:.02em;padding:3px 7px;white-space:nowrap}
+.winter-card.middle{background:#fff9db;border-color:#e7c95b}
+.winter-card.middle .winter-chip,.winter-card.middle .winter-audience{color:#735410}
+.winter-card.middle .winter-times button{border-color:#d5b647;color:#6d5114}
+.winter-card.middle .winter-times button:hover{background:#fff3c4}
+@media(max-width:700px){.year2027-filters{display:block}.year2027-filters .grade-filters{display:flex;overflow-x:auto;flex-wrap:nowrap;padding-bottom:8px}.year2027-filters .grade-filters button{flex-shrink:0}.year2027-filters .day-filter{display:flex;justify-content:flex-end;margin-top:8px}}
