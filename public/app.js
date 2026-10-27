@@ -139,12 +139,13 @@ function renderWinter(){
     {heading:'1월 한정',keys:['special2027-experiment-12','special2027-experiment-34','special2027-experiment-56']}
   ];
   grid.innerHTML=groups.map(group=>{const cards=group.keys.map(key=>{
-    const sample=all.find(c=>winter2027Course(c).key===key);if(!sample)return '';
-    const info=winter2027Course(sample),ready=classes.find(c=>c.id===sample.id);
+    const sample=all.find(c=>winter2027Course(c).key===key);
+    const info=winter2027Course(sample||{id:key,title:'네비게이터'});if(!info)return '';
+    const ready=sample&&classes.find(c=>c.id===sample.id);
     const descriptions={middle:'초3~초6을 한번에 정리하는 수업입니다.',high:'중학 과학 총정리로 2027년 고1 3월 모의고사를 대비합니다.','special2027-debate-3':'시미쌤의 초등 과학 문해력(3) 책을 활용해 교과서 내용을 글로 정리해보고, 함께 토론하며 생각을 넓혀가는 특강','special2027-debate-4':'시미쌤의 초등 과학 문해력(4) 책을 활용해 교과서 내용을 글로 정리해보고, 함께 토론하며 생각을 넓혀가는 특강','special2027-debate-56':'회차별 최신 과학 토론주제(지진,미세플라스틱 등)로 생각을 나누고, 근거를 들어 과학적 사고력과 표현력을 키워보는 특강','special2027-navigator-1':'EBS개념완성 통합과학1을 통해 수능을 대비하는 과정입니다.','special2027-navigator-2':'EBS개념완성 통합과학2를 통해 수능을 대비하는 과정입니다.'};
     const tagline=descriptions[key]||(key.includes('experiment')?'물리/화학/생명 지구과학 4가지 분야를 손으로 해보고 보고서로 정리하는 특강입니다.':'');
     const level=key==='middle'?'middle':key==='high'||key.includes('navigator')?'high':'';
-    return '<article class="winter-card '+level+'"><span class="winter-chip">'+esc(info.period)+'</span><h3>'+esc(info.title)+'</h3><p class="winter-audience">신청 가능 · '+esc(info.audience)+'</p><p>'+esc(tagline)+'</p><div class="winter-times">'+(ready?'<button type="button" data-request="year2027" data-id="'+esc(ready.id)+'"><span><strong>'+esc(scheduleLabel2027(ready))+'</strong></span><b>'+(ready.bundle?'묶음 신청':'특강 신청')+' ↗</b></button>':'<p>현재 신청 가능한 자리가 없습니다. 학원에 문의해 주세요.</p>')+'</div></article>';
+    return '<article class="winter-card '+level+'"><span class="winter-chip">'+esc(info.period)+'</span><h3>'+esc(info.title)+'</h3><p class="winter-audience">'+(ready?'신청 가능 · ':'신청 대상 · ')+esc(info.audience)+'</p><p>'+esc(tagline)+'</p><div class="winter-times">'+(ready?'<button type="button" data-request="year2027" data-id="'+esc(ready.id)+'"><span><strong>'+esc(scheduleLabel2027(ready))+'</strong></span><b>'+(ready.bundle?'묶음 신청':'특강 신청')+' ↗</b></button>':'<p>'+(sample?'현재 신청 가능한 자리가 없습니다.':'시간표 확인 중입니다.')+' 학원에 문의해 주세요.</p>')+'</div></article>';
   }).join('');return cards?'<section class="winter-section"><h4>'+group.heading+'</h4><div class="winter-grid">'+cards+'</div></section>':'';}).join('');
 }
 if(location.hash==='#winter')selectTab('winter');
