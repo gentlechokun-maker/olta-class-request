@@ -90,8 +90,9 @@ test('weekend room two blocks are skipped at the source and never restore roster
 test('confirmed winter timetable anchors create eight bookable specials and reject a changed period',()=>{
  const r=runtime(),f=fixture();
  for(const [cell,heading] of [
-  ['F17','신T 3 올치토론 특강(1,2월)'],['L17','신T 4 올치토론 특강(1,2월)'],
-  ['M63','신T5, 6 올치토론 특강(1,2월)'],['N71','고2 (대입네비게이터특강1)'],
+  ['F17','신T 3 올치토론 특강(1,2월)'],['F23','신T 3올치창의력특강(1,2월)'],
+  ['M17','신T 4 올치토론 특강(1,2월)'],['M23','신T 4올치창의력특강(1,2월)'],
+  ['M63','신T5, 6 올치토론 특강(1,2월)'],['M69','신T 5,6올치창의력특강(1,2월)'],['N71','고2 (대입네비게이터특강1)'],
   ['N83','고2 (대입네비게이터특강2)'],['L13','올치실험특강 초1 초2(1월)'],
   ['T13','올치실험특강 초3 초4(1월)'],['E59','올치실험특강 초5 초6(1월)']
  ]){const col=cell.charCodeAt(0)-65,row=Number(cell.slice(1))-1;f.values[row][col]=heading;}
@@ -100,7 +101,7 @@ test('confirmed winter timetable anchors create eight bookable specials and reje
  assert.equal(specials.length,8);assert.ok(specials.every(c=>!c.review));
  assert.ok(!result.classes.some(c=>['N72','N73','N84','N85'].includes(c.sourceCell)));
  assert.deepEqual(JSON.parse(JSON.stringify(specials.map(c=>[c.sourceCell,c.day,c.start,c.end]))),[
-  ['F17','월','14:00','17:00'],['L17','화','14:00','17:00'],['M63','금','14:00','17:00'],
+  ['F17','월','14:00','17:00'],['M17','화','14:00','17:00'],['M63','금','14:00','17:00'],
   ['N71','금','16:00','19:00'],['N83','금','19:00','21:00'],['L13','화','13:00','14:00'],
   ['T13','수','13:00','14:00'],['E59','목','13:00','14:00']
  ]);
@@ -108,4 +109,7 @@ test('confirmed winter timetable anchors create eight bookable specials and reje
  f.values[12][11]='올치실험특강 초1 초2(2월)';
  const changed=r.parse2027Timetable_(f.values,f.backgrounds).classes.find(c=>c.id==='special2027-experiment-12');
  assert.equal(changed.review,true);assert.equal(changed.remaining,6);assert.match(changed.issues.join(' '),/운영 기간/);
+ f.values[12][11]='올치실험특강 초1 초2(1월)';f.values[22][12]='';
+ const missingCreative=r.parse2027Timetable_(f.values,f.backgrounds).classes.find(c=>c.id==='special2027-debate-4');
+ assert.equal(missingCreative.review,true);assert.match(missingCreative.issues.join(' '),/창의력 특강/);
 });

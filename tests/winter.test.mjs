@@ -68,9 +68,9 @@ test('public bundled fields contain both schedules and no private resource or ro
 
 test('eight additional courses keep January-only and January–February eligibility separate',()=>{
  const cases=[
-  ['special2027-debate-3','초3 올치 토론 특강','월','14:00','17:00',['초3'],'2027년 1~2월'],
-  ['special2027-debate-4','초4 올치 토론 특강','화','14:00','17:00',['초4'],'2027년 1~2월'],
-  ['special2027-debate-56','초5·초6 올치 토론 특강','금','14:00','17:00',['초5','초6'],'2027년 1~2월'],
+  ['special2027-debate-3','초3 올치 토론·창의력 특강','월','14:00','17:00',['초3'],'2027년 1~2월'],
+  ['special2027-debate-4','초4 올치 토론·창의력 특강','화','14:00','17:00',['초4'],'2027년 1~2월'],
+  ['special2027-debate-56','초5·초6 올치 토론·창의력 특강','금','14:00','17:00',['초5','초6'],'2027년 1~2월'],
   ['special2027-navigator-1','대입 네비게이터 특강 1','금','16:00','19:00',['중3','고1','고2'],'2027년 1~2월'],
   ['special2027-navigator-2','대입 네비게이터 특강 2','금','19:00','21:00',['중3','고1','고2'],'2027년 1~2월'],
   ['special2027-experiment-12','초1·초2 올치 실험 특강','화','13:00','14:00',['초1','초2'],'2027년 1월'],
