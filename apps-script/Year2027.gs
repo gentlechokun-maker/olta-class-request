@@ -100,9 +100,9 @@ function parse2027Timetable_(values,backgrounds){
  // User-confirmed winter offerings are tied to source cells. A changed or missing
  // heading stays in the private review list rather than becoming bookable.
  const winterSpecs=[
-  ['special2027-debate-3','F17','초3','초3 올치 토론 특강','월','14:00','17:00',/3\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
-  ['special2027-debate-4','L17','초4','초4 올치 토론 특강','화','14:00','17:00',/4\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
-  ['special2027-debate-56','M63','초5','초5·초6 올치 토론 특강','금','14:00','17:00',/5\s*,\s*6\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
+  ['special2027-debate-3','F17','초3','초3 올치 토론·창의력 특강','월','14:00','17:00',/3\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
+  ['special2027-debate-4','M17','초4','초4 올치 토론·창의력 특강','화','14:00','17:00',/4\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
+  ['special2027-debate-56','M63','초5','초5·초6 올치 토론·창의력 특강','금','14:00','17:00',/5\s*,\s*6\s*올치\s*토론\s*특강/,/\(1\s*,\s*2월\)/],
   ['special2027-navigator-1','N71','중3','대입 네비게이터 특강 1','금','16:00','19:00',/대입\s*네비게이터\s*특강\s*1/,null],
   ['special2027-navigator-2','N83','중3','대입 네비게이터 특강 2','금','19:00','21:00',/대입\s*네비게이터\s*특강\s*2/,null],
   ['special2027-experiment-12','L13','초1','초1·초2 올치 실험 특강','화','13:00','14:00',/올치\s*실험\s*특강\s*초1\s*초2/,/\(1월\)/],
@@ -116,6 +116,8 @@ function parse2027Timetable_(values,backgrounds){
   const daySlot=band.days.find((d,i)=>col>=d.col&&col<(band.days[i+1]?.col||23));
   const issues=[];
   if(!titlePattern.test(header)||(periodPattern&&!periodPattern.test(header)))issues.push('원본 특강 제목·운영 기간 확인 필요');
+  const continuation={'special2027-debate-3':['F23',/3\s*올치\s*창의력\s*특강/],'special2027-debate-4':['M23',/4\s*올치\s*창의력\s*특강/],'special2027-debate-56':['M69',/5\s*,\s*6\s*올치\s*창의력\s*특강/]}[id];
+  if(continuation){const m=continuation[0].match(/^([A-W])(\d+)$/),follow=get(Number(m[2])-1,m[1].charCodeAt(0)-65);if(!continuation[1].test(follow)||(periodPattern&&!periodPattern.test(follow)))issues.push('이어지는 창의력 특강 제목·운영 기간 확인 필요');}
   if(daySlot?.day!==day||!/^\d+교실$/.test(room))issues.push('특강 요일·교실 확인 필요');
   combined.push({id,sourceCell,grade,title,day,start,end,room,teacher:headingYear2027_(header).teacher,header,names:[],issues});
  }
@@ -235,9 +237,9 @@ function applyConfirmed2027_(result,values,confirmed){
 // Public course rules; no teacher or student records belong here.
 function winter2027Course(c){
   const specials={
-    'special2027-debate-3':{title:'초3 올치 토론 특강',period:'2027년 1~2월',grades:['초3']},
-    'special2027-debate-4':{title:'초4 올치 토론 특강',period:'2027년 1~2월',grades:['초4']},
-    'special2027-debate-56':{title:'초5·초6 올치 토론 특강',period:'2027년 1~2월',grades:['초5','초6']},
+    'special2027-debate-3':{title:'초3 올치 토론·창의력 특강',period:'2027년 1~2월',grades:['초3']},
+    'special2027-debate-4':{title:'초4 올치 토론·창의력 특강',period:'2027년 1~2월',grades:['초4']},
+    'special2027-debate-56':{title:'초5·초6 올치 토론·창의력 특강',period:'2027년 1~2월',grades:['초5','초6']},
     'special2027-navigator-1':{title:'대입 네비게이터 특강 1',period:'2027년 1~2월',grades:['중3','고1','고2']},
     'special2027-navigator-2':{title:'대입 네비게이터 특강 2',period:'2027년 1~2월',grades:['중3','고1','고2']},
     'special2027-experiment-12':{title:'초1·초2 올치 실험 특강',period:'2027년 1월',grades:['초1','초2']},
