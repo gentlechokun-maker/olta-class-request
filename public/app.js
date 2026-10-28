@@ -1,3 +1,4 @@
+import {YEAR2027_GRADES,yearGradeLabel,enrollmentRoute,enrollmentPath} from './enrollment-links.js?v=20261028-links';
 const opening={ 'y2027-C21':'초1', 'y2027-C33':'초3', 'y2027-J21':'초4', 'y2027-Q29':'초2', 'y2027-C83':'초5' };
 import {winter2027Course,winter2027Grade,scheduleKey2027,scheduleLabel2027} from './winter-courses.js?v=20261028-split2';
 import {readPublicData} from './public-data.js?v=20261020-year2027';
@@ -9,9 +10,10 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const classTitle=c=>String(c.title||'').replaceAll('시작반','신규반');
 const config=window.OLTA_CONFIG||{};
 const upcoming={catalog:null,loading:false,error:''};
-const state={tab:'existing',grade:'',day:'',yearGrade:'',yearDay:'',catalog:null,loading:true};
-const mobileState={grade:'초1',day:'',page:0};
-const yearMobileState={grade:'',day:'',page:0};
+const initialRoute=enrollmentRoute(location.search,location.hash);
+const state={tab:'existing',grade:initialRoute.tab==='existing'?initialRoute.grade:'',day:'',yearGrade:initialRoute.tab==='year2027'?initialRoute.grade:'',yearDay:'',catalog:null,loading:true};
+const mobileState={grade:state.grade||'초1',day:'',page:0};
+const yearMobileState={grade:state.yearGrade||'초1',day:'',page:0};
 const mobileMedia=window.matchMedia('(max-width: 700px)');
 const validUrl=url=>/^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/.test(url);
 function connection(text,type=''){const el=$('#connection');el.className='connection '+type;el.textContent=text;}
@@ -42,14 +44,15 @@ function render(){
   $('#makeup-grid').innerHTML=!data.makeupEnabled&&data.mode!=='demo'?'<div class="empty">보강 신청 기능을 준비 중입니다. 상담 연락처로 문의해 주세요.</div>':allFiltered.map(c=>`<article class="class-card"><span class="grade-label">${esc(c.grade)} · 재원생 보강</span><h3>${esc(classTitle(c))}</h3><p class="schedule">${esc(c.day)}요일 ${esc(c.start)}–${esc(c.end)}</p><p class="teacher">${esc(c.room)}</p><p>다른 주차 보강 30분<br>같은 수업 주차는 빈자리 수업 · 다른 주차는 수업 전후</p><button class="card-button" data-request="makeup" data-id="${esc(c.id)}" ${c.review?'disabled':''}>${c.review?'시간표 확인 중':'이 반 원생 보강 예약 ↗'}</button></article>`).join('')||'<div class="empty">조건에 맞는 정규반이 없습니다.</div>';
   renderMobile();
 }
-function selectTab(tab){if(!['existing','winter','year2027','makeup'].includes(tab))return;state.tab=tab;renderUpdated();mobileState.page=0;mobileState.day='';renderMobile();for(const t of ['existing','winter','year2027','makeup']){const active=t===tab;$('#tab-'+t).setAttribute('aria-selected',String(active));$('#tab-'+t).tabIndex=active?0:-1;$('#panel-'+t).hidden=!active;}$('#filters').hidden=['year2027','winter'].includes(tab);$('.mobile-controls').hidden=['year2027','winter','makeup'].includes(tab);if(['year2027','winter'].includes(tab))load2027();$('#classes').scrollIntoView({behavior:'smooth',block:'start'});}
+function updateEnrollmentUrl(){if(!['existing','year2027','winter'].includes(state.tab))return;const grade=state.tab==='year2027'?state.yearGrade:state.grade;history.replaceState(null,'',location.pathname+enrollmentPath(state.tab,grade));}
+function selectTab(tab){if(!['existing','winter','year2027','makeup'].includes(tab))return;state.tab=tab;updateEnrollmentUrl();renderUpdated();mobileState.page=0;mobileState.day='';renderMobile();for(const t of ['existing','winter','year2027','makeup']){const active=t===tab;$('#tab-'+t).setAttribute('aria-selected',String(active));$('#tab-'+t).tabIndex=active?0:-1;$('#panel-'+t).hidden=!active;}$('#filters').hidden=['year2027','winter'].includes(tab);$('.mobile-controls').hidden=['year2027','winter','makeup'].includes(tab);if(['year2027','winter'].includes(tab))load2027();$('#classes').scrollIntoView({behavior:'smooth',block:'start'});}
 function openRequest(kind,id){
   if(!['existing','year2027','makeup'].includes(kind))return;
   if(kind==='makeup'){location.href='./booking.html?kind=absence&targetId='+encodeURIComponent(id);return;}
   const catalog=kind==='year2027'?upcoming.catalog:state.catalog;if(!catalog)return;const target=catalog.classes.find(c=>c.id===id);if(!target||(['existing','year2027'].includes(kind)&&(target.review||target.remaining<1)))return;
   const special=kind==='year2027'?winter2027Course(target):null;
   const form=$('#request-form');if(form.dataset.sending==='true'){if(!$('#request-dialog').open)$('#request-dialog').showModal();return;}form.hidden=false;$('#request-result').hidden=true;form.reset();form.elements.kind.value=kind;form.elements.targetId.value=id;form.elements.scheduleKey.value=kind==='year2027'?scheduleKey2027(target):'';form.elements.requestId.value=crypto.randomUUID();
-  const grades=special?special.options.map(o=>o.value):kind==='year2027'?[target.grade]:studentGrades([target.grade]);form.elements.grade.innerHTML=grades.map(g=>`<option value="${esc(g)}">${esc(special?special.options.find(o=>o.value===g).label:g)}</option>`).join('');const selectedGrade=mobileMedia.matches?mobileState.grade:state.grade;if(grades.includes(selectedGrade))form.elements.grade.value=selectedGrade;
+  const grades=special?special.options.map(o=>o.value):kind==='year2027'?[target.grade]:studentGrades([target.grade]);form.elements.grade.innerHTML=grades.map(g=>`<option value="${esc(g)}">${esc(special?special.options.find(o=>o.value===g).label:kind==='year2027'?yearGradeLabel(g):g)}</option>`).join('');const selectedGrade=mobileMedia.matches?mobileState.grade:state.grade;if(grades.includes(selectedGrade))form.elements.grade.value=selectedGrade;
   renderPrivacy(catalog);if(kind==='year2027')$('#consent-description').textContent=`수집 항목: 원생 이름·학년(기준 연도 포함), 보호자 연락처, 상담 참고 내용 / 목적: 2027년 수강 상담 및 연락 / 보관: 접수 후 ${Number(catalog.retentionDays)||90}일. 문의·삭제 요청: ${catalog.privacyContact||'운영자 상담 담당'}`;$('#request-grade-label').textContent=special?'학생 학년 · 기준 연도 선택':kind==='year2027'?'2027년 기준 학년':'희망 학년';
   $('#request-title').textContent=special?(special.title.endsWith('특강')?special.title:special.title+' 특강')+' 신청':kind==='year2027'?'27년 수업 신청':kind==='makeup'?'결석·보강 예약':'수강 신청 및 변경';
   $('#request-summary').textContent=`${special?special.period+' · '+special.audience+' · ':kind==='year2027'?'2027년 '+target.grade+' · ':''}${(special?special.title:classTitle(target))+' · '}${kind==='year2027'?scheduleLabel2027(target):target.day+'요일 '+target.start+'–'+target.end} · ${target.room}${kind==='year2027'?' · 정원 '+(Number(target.capacity)||classCapacity(target))+'명':''}`;
@@ -70,7 +73,7 @@ function updateMakeupTime(){
   catch(e){$('#makeup-time').textContent=e.message;f.querySelector('[type=submit]').disabled=true;}
 }
 $('#makeup-fields').addEventListener('change',updateMakeupTime);
-document.addEventListener('click',event=>{const button=event.target.closest('button,[data-tab]');if(!button)return;if(button.dataset.tab)selectTab(button.dataset.tab);if(button.hasAttribute('data-grade')){state.grade=button.dataset.grade;render();}if(button.dataset.request)openRequest(button.dataset.request,button.dataset.id);if(button.hasAttribute('data-close'))button.closest('dialog').close();});
+document.addEventListener('click',event=>{const button=event.target.closest('button,[data-tab]');if(!button)return;if(button.dataset.tab)selectTab(button.dataset.tab);if(button.hasAttribute('data-grade')){state.grade=button.dataset.grade;mobileState.grade=state.grade||'초1';mobileState.day='';mobileState.page=0;updateEnrollmentUrl();render();}if(button.dataset.request)openRequest(button.dataset.request,button.dataset.id);if(button.hasAttribute('data-close'))button.closest('dialog').close();});
 $('.tabs').addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=['existing','year2027','winter','makeup'];const tab=e.key==='Home'?tabs[0]:e.key==='End'?tabs[tabs.length-1]:tabs[(tabs.indexOf(state.tab)+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];selectTab(tab);$('#tab-'+tab).focus();});
 $('#day-filter').addEventListener('change',e=>{state.day=e.target.value;render();});
 $('#privacy-button').onclick=()=>$('#privacy-dialog').showModal();
@@ -95,7 +98,7 @@ function renderMobile(){
   }).join('');
   $('#mobile-existing').innerHTML='<p class="mobile-note">'+esc(note)+'</p><div class="mobile-result-count" aria-live="polite">'+mobileState.grade+' · '+mobileState.day+'요일 · '+selected.length+'개 시간</div>'+(cards||'<p class="mobile-empty">'+(data.mode==='error'?'시간표 연결을 확인해 주세요.':'신청 가능한 시간이 없습니다. 다른 요일을 선택해 주세요.')+'</p>')+(pages>1?'<nav class="mobile-pages" aria-label="시간 목록 페이지"><button data-mobile-page="-1" '+(mobileState.page===0?'disabled':'')+'>이전</button><span>'+(mobileState.page+1)+' / '+pages+'</span><button data-mobile-page="1" '+(mobileState.page===pages-1?'disabled':'')+'>다음</button></nav>':'');
 }
-$('#mobile-grade').addEventListener('change',e=>{mobileState.grade=e.target.value;mobileState.day='';mobileState.page=0;renderMobile();});
+$('#mobile-grade').addEventListener('change',e=>{mobileState.grade=e.target.value;state.grade=mobileState.grade;mobileState.day='';mobileState.page=0;updateEnrollmentUrl();render();});
 $('#mobile-day').addEventListener('change',e=>{mobileState.day=e.target.value;mobileState.page=0;renderMobile();});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-mobile-page]');if(b){mobileState.page+=Number(b.dataset.mobilePage);renderMobile();}});
 
@@ -116,9 +119,9 @@ function render2027(){
   if(upcoming.error){status.textContent=upcoming.error;grid.innerHTML='<button type="button" id="year2027-retry">다시 확인</button>';$('#year2027-retry').onclick=()=>load2027(true);$('#mobile-year2027').innerHTML='<p class="mobile-empty">'+esc(upcoming.error)+'</p><button type="button" id="year2027-mobile-retry">다시 확인</button>';$('#year2027-mobile-retry').onclick=()=>load2027(true);return;}
   const days=['월','화','수','목','금','토','일'];
   const classes=(upcoming.catalog?.classes||[]).filter(c=>!winter2027Course(c)&&!c.review&&Number(c.remaining)>0);
-  const grades=[...new Set(classes.map(c=>c.grade))].sort((a,b)=>['초','중','고'].indexOf(a[0])-['초','중','고'].indexOf(b[0])||Number(a.slice(1))-Number(b.slice(1)));
+  const grades=YEAR2027_GRADES;
   if(state.yearGrade&&!grades.includes(state.yearGrade))state.yearGrade='';
-  $('#year2027-grades').innerHTML=['',...grades].map(g=>'<button type="button" data-year-grade="'+esc(g)+'" class="'+(state.yearGrade===g?'active':'')+'" aria-pressed="'+(state.yearGrade===g)+'">'+(g?esc(gradeLabel(g)):'전체')+'</button>').join('');
+  $('#year2027-grades').innerHTML=['',...grades].map(g=>'<button type="button" data-year-grade="'+esc(g)+'" class="'+(state.yearGrade===g?'active':'')+'" aria-pressed="'+(state.yearGrade===g)+'">'+(g?esc(yearGradeLabel(g)):'전체')+'</button>').join('');
   const filtered=classes.filter(c=>(!state.yearGrade||c.grade===state.yearGrade)&&(!state.yearDay||c.day===state.yearDay)).sort((a,b)=>days.indexOf(a.day)-days.indexOf(b.day)||a.start.localeCompare(b.start)||a.grade.localeCompare(b.grade));
   status.textContent=(state.yearGrade?gradeLabel(state.yearGrade)+' · ':'')+(state.yearDay?state.yearDay+'요일 · ':'')+filtered.length+'개 수업'+(upcoming.catalog?.updatedAt?' · 확인 '+new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(upcoming.catalog.updatedAt)):'');
 
@@ -128,23 +131,23 @@ function render2027(){
 }
 function render2027Mobile(classes){
   const days=['월','화','수','목','금','토','일'];
-  const grades=[...new Set(classes.map(c=>c.grade))].sort((a,b)=>['초','중','고'].indexOf(a[0])-['초','중','고'].indexOf(b[0])||Number(a.slice(1))-Number(b.slice(1)));
+  const grades=YEAR2027_GRADES;
   if(!grades.includes(yearMobileState.grade)){yearMobileState.grade=grades[0]||'';yearMobileState.day='';yearMobileState.page=0;}
   const rows=classes.filter(c=>c.grade===yearMobileState.grade).sort((a,b)=>a.start.localeCompare(b.start)||a.end.localeCompare(b.end));
   const available=days.filter(day=>rows.some(c=>c.day===day));
   if(!available.includes(yearMobileState.day)){yearMobileState.day=available[0]||'월';yearMobileState.page=0;}
-  $('#year2027-mobile-grade').innerHTML=grades.map(g=>'<option value="'+esc(g)+'" '+(g===yearMobileState.grade?'selected':'')+'>'+esc(gradeLabel(g))+'</option>').join('');
+  $('#year2027-mobile-grade').innerHTML=grades.map(g=>'<option value="'+esc(g)+'" '+(g===yearMobileState.grade?'selected':'')+'>'+esc(yearGradeLabel(g))+'</option>').join('');
   $('#year2027-mobile-day').innerHTML=days.map(day=>'<option value="'+day+'" '+(day===yearMobileState.day?'selected':'')+'>'+day+'요일'+(available.includes(day)?'':' · 수업 없음')+'</option>').join('');
   const selected=rows.filter(c=>c.day===yearMobileState.day),pages=Math.max(1,Math.ceil(selected.length/4));yearMobileState.page=Math.min(yearMobileState.page,pages-1);
   const cards=selected.slice(yearMobileState.page*4,yearMobileState.page*4+4).map(c=>'<article class="mobile-class'+(opening[c.id]===c.grade?' opening-class':'')+'"><div><strong>'+esc(c.start)+'–'+esc(c.end)+'</strong>'+(opening[c.id]===c.grade?'<span class="opening-badge">(개강)</span>':'')+'<span>'+esc(classTitle(c))+' · '+esc(c.room)+' · 정원 '+(Number(c.capacity)||classCapacity(c))+'명</span><small>신청 가능</small></div><button data-request="year2027" data-id="'+esc(c.id)+'">수강 신청</button></article>').join('');
   $('#mobile-year2027').innerHTML='<p class="mobile-note">수업을 선택하면 2027년 수강 신청서를 작성할 수 있어요.</p><div class="mobile-result-count" aria-live="polite">'+esc(yearMobileState.grade)+' · '+esc(yearMobileState.day)+'요일 · '+selected.length+'개 시간</div>'+(cards||'<p class="mobile-empty">신청 가능한 시간이 없습니다. 다른 요일을 선택해 주세요.</p>')+(pages>1?'<nav class="mobile-pages" aria-label="2027년 시간 목록 페이지"><button data-year-mobile-page="-1" '+(yearMobileState.page===0?'disabled':'')+'>이전</button><span>'+(yearMobileState.page+1)+' / '+pages+'</span><button data-year-mobile-page="1" '+(yearMobileState.page===pages-1?'disabled':'')+'>다음</button></nav>':'');
 }
-$('#year2027-mobile-grade').addEventListener('change',event=>{yearMobileState.grade=event.target.value;yearMobileState.day='';yearMobileState.page=0;render2027Mobile((upcoming.catalog?.classes||[]).filter(c=>!winter2027Course(c)&&!c.review&&Number(c.remaining)>0));});
+$('#year2027-mobile-grade').addEventListener('change',event=>{yearMobileState.grade=event.target.value;state.yearGrade=yearMobileState.grade;yearMobileState.day='';yearMobileState.page=0;updateEnrollmentUrl();render2027();});
 $('#year2027-mobile-day').addEventListener('change',event=>{yearMobileState.day=event.target.value;yearMobileState.page=0;render2027Mobile((upcoming.catalog?.classes||[]).filter(c=>!winter2027Course(c)&&!c.review&&Number(c.remaining)>0));});
 document.addEventListener('click',event=>{const button=event.target.closest('[data-year-mobile-page]');if(!button)return;yearMobileState.page+=Number(button.dataset.yearMobilePage);render2027Mobile((upcoming.catalog?.classes||[]).filter(c=>!winter2027Course(c)&&!c.review&&Number(c.remaining)>0));});
-$('#year2027-grades').addEventListener('click',event=>{const button=event.target.closest('[data-year-grade]');if(!button)return;state.yearGrade=button.dataset.yearGrade;render2027();});
+$('#year2027-grades').addEventListener('click',event=>{const button=event.target.closest('[data-year-grade]');if(!button)return;state.yearGrade=button.dataset.yearGrade;yearMobileState.grade=state.yearGrade||'초1';yearMobileState.day='';yearMobileState.page=0;updateEnrollmentUrl();render2027();});
 $('#year2027-day').onchange=event=>{state.yearDay=event.target.value;render2027();};
-if(location.hash==='#year2027'||new URLSearchParams(location.search).get('year')==='2027')selectTab('year2027');
+if(initialRoute.tab==='year2027')selectTab('year2027');
 
 function renderWinter(){
   const status=$('#winter-status'),grid=$('#winter-grid');
@@ -170,4 +173,7 @@ function renderWinter(){
     return '<article class="winter-card '+level+'"><span class="winter-chip">'+esc(info.period)+'</span><h3>'+esc(info.title)+'</h3><p class="winter-audience">'+(ready?'신청 가능 · ':'신청 대상 · ')+esc(info.audience)+'</p><p>'+esc(tagline)+'</p><div class="winter-times">'+(ready?'<button type="button" data-request="year2027" data-id="'+esc(ready.id)+'"><span><strong>'+esc(scheduleLabel2027(ready))+'</strong></span><b>'+(ready.bundle?'묶음 신청':'특강 신청')+' ↗</b></button>':'<p>'+(expected?esc(expected[0]+'요일 '+expected[1]+'–'+expected[2])+' · ':'')+(!correctTime||!sample?'신청 시간표 갱신 중입니다.':'현재 신청 가능한 자리가 없습니다.')+'</p>')+'</div></article>';
   }).join('');return cards?'<section class="winter-section"><h4>'+group.heading+'</h4><div class="winter-grid">'+cards+'</div></section>':'';}).join('');
 }
-if(location.hash==='#winter')selectTab('winter');
+if(initialRoute.tab==='winter')selectTab('winter');
+if(initialRoute.tab==='existing'&&initialRoute.grade)selectTab('existing');
+window.addEventListener('hashchange',()=>{if(!['#classes','#year2027','#winter'].includes(location.hash))return;const route=enrollmentRoute(location.search,location.hash);if(route.tab==='year2027'){state.yearGrade=route.grade;yearMobileState.grade=route.grade||'초1';yearMobileState.day='';yearMobileState.page=0;}else if(route.tab==='existing'){state.grade=route.grade;mobileState.grade=route.grade||'초1';mobileState.day='';}selectTab(route.tab);render();if(upcoming.catalog)render2027();});
+
