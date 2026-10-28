@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {enrollmentRoute,enrollmentPath,enrollmentLinks,YEAR2027_GRADES,yearGradeLabel} from '../public/enrollment-links.js';
+import {enrollmentRoute,enrollmentPath,enrollmentLinks,YEAR2027_GRADES,yearGradeLabel,mobileWeekdays} from '../public/enrollment-links.js';
 test('22 distinct links open the intended tab and grade without whole-list links',()=>{
  const links=enrollmentLinks();assert.equal(links.length,22);assert.equal(new Set(links.map(x=>x.path)).size,22);
  assert.equal(links.filter(x=>x.tab==='existing').length,10);assert.equal(links.filter(x=>x.tab==='year2027').length,11);
  for(const link of links){const url=new URL(link.path,'https://example.com/');assert.deepEqual(enrollmentRoute(url.search,url.hash),{tab:link.tab,grade:link.grade});}
+});
+
+test('mobile weekdays omit empty days and recover selection when a grade or schedule changes',()=>{
+ const rows=[{day:'토'},{day:'월'},{day:'토'}];
+ assert.deepEqual(mobileWeekdays(rows,'토'),{days:['월','토'],day:'토'});
+ assert.deepEqual(mobileWeekdays(rows,'금'),{days:['월','토'],day:'월'});
+ assert.deepEqual(mobileWeekdays([],'월'),{days:[],day:''});
 });
 test('year grade labels and invalid grade links are explicit and bounded',()=>{
  for(const grade of YEAR2027_GRADES)assert.equal(yearGradeLabel(grade),grade+' (27년 기준)');
