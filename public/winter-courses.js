@@ -1,9 +1,9 @@
 // Public course rules; no teacher or student records belong here.
 export function winter2027Course(c){
   const specials={
-    'special2027-debate-3':{title:'초3 올치 토론 특강',period:'2027년 1~2월',grades:['초3']},
-    'special2027-debate-4':{title:'초4 올치 토론 특강',period:'2027년 1~2월',grades:['초4']},
-    'special2027-debate-56':{title:'초5·초6 올치 토론 특강',period:'2027년 1~2월',grades:['초5','초6']},
+    'special2027-debate-3':{title:'초3 올치 토론·창의력 특강',period:'2027년 1~2월',grades:['초3']},
+    'special2027-debate-4':{title:'초4 올치 토론·창의력 특강',period:'2027년 1~2월',grades:['초4']},
+    'special2027-debate-56':{title:'초5·초6 올치 토론·창의력 특강',period:'2027년 1~2월',grades:['초5','초6']},
     'special2027-navigator-1':{title:'대입 네비게이터 특강 1',period:'2027년 1~2월',grades:['중3','고1','고2']},
     'special2027-navigator-2':{title:'대입 네비게이터 특강 2',period:'2027년 1~2월',grades:['중3','고1','고2']},
     'special2027-experiment-12':{title:'초1·초2 올치 실험 특강',period:'2027년 1월',grades:['초1','초2']},

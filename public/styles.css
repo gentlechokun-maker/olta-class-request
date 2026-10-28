@@ -70,3 +70,13 @@
 .winter-card.middle .winter-times button{border-color:#d5b647;color:#6d5114}
 .winter-card.middle .winter-times button:hover{background:#fff3c4}
 @media(max-width:700px){.year2027-filters{display:block}.year2027-filters .grade-filters{display:flex;overflow-x:auto;flex-wrap:nowrap;padding-bottom:8px}.year2027-filters .grade-filters button{flex-shrink:0}.year2027-filters .day-filter{display:flex;justify-content:flex-end;margin-top:8px}}
+
+/* Keep all four application tabs visible as a two by two mobile menu. */
+@media(max-width:700px){
+  .tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+  .tabs [role=tab]{min-width:0;min-height:48px;border-radius:9px;padding:8px 6px;white-space:normal}
+  .tabs .winter-tab{grid-column:auto;grid-row:auto;padding:8px 6px;border-radius:9px}
+  #panel-year2027>.class-list-guide,#panel-year2027>.year2027-filters,#panel-year2027>#year2027-grid,#panel-year2027>.panel-note{display:none}
+  #panel-year2027>.year2027-mobile-controls{display:grid}
+  #panel-year2027>#mobile-year2027{display:block}
+}
