@@ -87,7 +87,7 @@ test('weekend room two blocks are skipped at the source and never restore roster
  assert.equal(r.applyConfirmed2027_(result,f.values,[override]).classes.length,1);
 });
 
-test('confirmed winter timetable anchors create eight bookable specials and reject a changed period',()=>{
+test('confirmed winter timetable anchors create eleven bookable specials and reject a changed period',()=>{
  const r=runtime(),f=fixture();
  for(const [cell,heading] of [
   ['F17','신T 3 올치토론 특강(1,2월)'],['F23','신T 3올치창의력특강(1,2월)'],
@@ -98,10 +98,10 @@ test('confirmed winter timetable anchors create eight bookable specials and reje
  ]){const col=cell.charCodeAt(0)-65,row=Number(cell.slice(1))-1;f.values[row][col]=heading;}
  for(const [row,label] of [[72,'통합과학1'],[73,'EBS개념완성1'],[84,'통합과학2'],[85,'EBS개념완성2']])f.values[row-1][13]=label;
  const result=r.parse2027Timetable_(f.values,f.backgrounds),specials=result.classes.filter(c=>c.id.startsWith('special2027-'));
- assert.equal(specials.length,8);assert.ok(specials.every(c=>!c.review));
+ assert.equal(specials.length,11);assert.ok(specials.every(c=>!c.review));
  assert.ok(!result.classes.some(c=>['N72','N73','N84','N85'].includes(c.sourceCell)));
  assert.deepEqual(JSON.parse(JSON.stringify(specials.map(c=>[c.sourceCell,c.day,c.start,c.end]))),[
-  ['F17','월','14:00','17:00'],['M17','화','14:00','17:00'],['M63','금','14:00','17:00'],
+  ['F17','월','14:00','15:30'],['F23','월','15:30','17:00'],['M17','화','14:00','15:30'],['M23','화','15:30','17:00'],['M63','금','14:00','15:30'],['M69','금','15:30','17:00'],
   ['N71','금','16:00','19:00'],['N83','금','19:00','21:00'],['L13','화','13:00','14:00'],
   ['T13','수','13:00','14:00'],['E59','목','13:00','14:00']
  ]);
@@ -109,7 +109,9 @@ test('confirmed winter timetable anchors create eight bookable specials and reje
  f.values[12][11]='올치실험특강 초1 초2(2월)';
  const changed=r.parse2027Timetable_(f.values,f.backgrounds).classes.find(c=>c.id==='special2027-experiment-12');
  assert.equal(changed.review,true);assert.equal(changed.remaining,6);assert.match(changed.issues.join(' '),/운영 기간/);
- f.values[12][11]='올치실험특강 초1 초2(1월)';f.values[22][12]='';
- const missingCreative=r.parse2027Timetable_(f.values,f.backgrounds).classes.find(c=>c.id==='special2027-debate-4');
- assert.equal(missingCreative.review,true);assert.match(missingCreative.issues.join(' '),/창의력 특강/);
+ f.values[12][11]='올치실험특강 초1 초2(1월)';f.values[22][12]='신T 4올치창의력특강(2월)';
+ const separate=r.parse2027Timetable_(f.values,f.backgrounds).classes;
+ const missingCreative=separate.find(c=>c.id==='special2027-creative-4');
+ assert.equal(separate.find(c=>c.id==='special2027-debate-4').review,false);
+ assert.equal(missingCreative.review,true);assert.match(missingCreative.issues.join(' '),/운영 기간/);
 });

@@ -66,11 +66,14 @@ test('public bundled fields contain both schedules and no private resource or ro
  assert.equal(result.classes[0].sessions.length,2);assert.ok(!result.classes.some(c=>c.id==='y2027-F5'));
 });
 
-test('eight additional courses keep January-only and January–February eligibility separate',()=>{
+test('eleven additional courses keep January-only and January–February eligibility separate',()=>{
  const cases=[
-  ['special2027-debate-3','초3 올치 토론·창의력 특강','월','14:00','17:00',['초3'],'2027년 1~2월'],
-  ['special2027-debate-4','초4 올치 토론·창의력 특강','화','14:00','17:00',['초4'],'2027년 1~2월'],
-  ['special2027-debate-56','초5·초6 올치 토론·창의력 특강','금','14:00','17:00',['초5','초6'],'2027년 1~2월'],
+  ['special2027-debate-3','초3 올치 토론 특강','월','14:00','15:30',['초3'],'2027년 1~2월'],
+  ['special2027-creative-3','초3 올치 창의력 특강','월','15:30','17:00',['초3'],'2027년 1~2월'],
+  ['special2027-debate-4','초4 올치 토론 특강','화','14:00','15:30',['초4'],'2027년 1~2월'],
+  ['special2027-creative-4','초4 올치 창의력 특강','화','15:30','17:00',['초4'],'2027년 1~2월'],
+  ['special2027-debate-56','초5·초6 올치 토론 특강','금','14:00','15:30',['초5','초6'],'2027년 1~2월'],
+  ['special2027-creative-56','초5·초6 올치 창의력 특강','금','15:30','17:00',['초5','초6'],'2027년 1~2월'],
   ['special2027-navigator-1','대입 네비게이터 특강 1','금','16:00','19:00',['중3','고1','고2'],'2027년 1~2월'],
   ['special2027-navigator-2','대입 네비게이터 특강 2','금','19:00','21:00',['중3','고1','고2'],'2027년 1~2월'],
   ['special2027-experiment-12','초1·초2 올치 실험 특강','화','13:00','14:00',['초1','초2'],'2027년 1월'],
@@ -88,4 +91,17 @@ test('eight additional courses keep January-only and January–February eligibil
   assert.equal(winter2027Grade(c,'2027:초6')?.grade,grades.includes('초6')?'초6':undefined);
   assert.equal(winter2027Grade(c,'2026:'+grades[0]),null);
  }
+});
+
+test('debate and creativity are independent applications and reject an old combined schedule',()=>{
+ const r=runtime(),rows=[];
+ const debate={id:'special2027-debate-4',title:'초4 올치 토론 특강',grade:'초4',day:'화',start:'14:00',end:'15:30',room:'6교실',capacity:6,remaining:6,review:false};
+ const creative={...debate,id:'special2027-creative-4',title:'초4 올치 창의력 특강',start:'15:30',end:'17:00'};
+ r.read2027Snapshot_=()=>({classes:[debate,creative]});r.read_=()=>rows;r.append_=(table,row)=>rows.push(row);r.SpreadsheetApp={flush(){}};
+ assert.equal(r.submit2027_(input(debate,'2027:초4')).ok,true);
+ assert.equal(r.submit2027_({...input(creative,'2027:초4'),requestId:'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'}).ok,true);
+ assert.equal(rows.length,2);assert.notEqual(rows[0].targetId,rows[1].targetId);
+ assert.match(rows[0].note,/14:00–15:30/);assert.match(rows[1].note,/15:30–17:00/);
+ const old={...debate,title:'초4 올치 토론·창의력 특강',end:'17:00'};
+ assert.throws(()=>r.validate2027_(input(old,'2027:초4')),/시간이 변경/);
 });
