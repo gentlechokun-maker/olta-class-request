@@ -13,3 +13,5 @@ export function enrollmentPath(tab,grade=''){
  return (tab!=='winter'&&grades.includes(grade)?'?grade='+gradeCode(grade):'')+(tab==='year2027'?'#year2027':tab==='winter'?'#winter':'#classes');
 }
 export function enrollmentLinks(){return [...EXISTING_GRADES.map(grade=>({tab:'existing',grade,label:'수강 신청 및 변경 · '+grade,path:enrollmentPath('existing',grade)})),...YEAR2027_GRADES.map(grade=>({tab:'year2027',grade,label:'27년 수업 신청 · '+yearGradeLabel(grade),path:enrollmentPath('year2027',grade)})),{tab:'winter',grade:'',label:'겨울방학 특강 신청',path:'#winter'}];}
+
+export function mobileWeekdays(rows,current=''){const days=['월','화','수','목','금','토','일'].filter(day=>rows.some(row=>row.day===day));return {days,day:days.includes(current)?current:days[0]||''};}
