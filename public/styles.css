@@ -97,3 +97,37 @@
 .mobile-grade-picker nav a{display:block;min-height:44px;padding:11px 12px;border-radius:6px;text-decoration:none;color:var(--ink);white-space:nowrap;font-size:14px;-webkit-touch-callout:default}
 .mobile-grade-picker nav a.active{background:#e4f1ff;color:#1261aa;font-weight:700}.mobile-grade-picker nav a.active::after{content:' ✓'}
 .mobile-grade-picker a:focus-visible,.mobile-grade-picker summary:focus-visible{outline:2px solid var(--green);outline-offset:-2px}
+
+/* Readable phone typography. Keep the two-line year menu inside its half-width tab. */
+@media (max-width:700px){
+  body{font-size:16px}
+  .site-header nav{font-size:13px}
+  .connection{font-size:12px}
+  .section-heading h2{font-size:21px}
+  .updated{font-size:11px;max-width:125px}
+  .tabs [role=tab]{font-size:clamp(12px,3.5vw,14px);line-height:1.35;padding:8px 4px}
+  .tabs .year-menu-note{font-size:clamp(9.5px,2.65vw,10.5px);letter-spacing:-.65px;white-space:nowrap}
+  .mobile-controls label,.mobile-grade-field{font-size:13px}
+  .mobile-grade-picker>summary{font-size:14px}
+  .mobile-note,.mobile-result-count,.mobile-pages span{font-size:13px}
+  .mobile-class strong{font-size:18px}
+  .mobile-class span,.mobile-class small,.mobile-class button{font-size:13px}
+  .mobile-empty,.panel-note,.new-intro p{font-size:13px}
+  .new-intro h3{font-size:18px}
+  .winter-banner-copy small,.winter-banner-copy>span,.winter-card p,.winter-heading p{font-size:13px}
+  .winter-times button{font-size:14px}
+  .winter-chip,.winter-badge{font-size:12px}
+  .how-section h2{font-size:20px}
+  .steps h3{font-size:14px}
+  .steps p,footer,footer button{font-size:12px}
+  .request-summary,form>label,.form-row>label{font-size:14px}
+  .consent-box,.checkbox,.form-note{font-size:13px}
+}
+
+@media (max-width:360px){
+  .winter-banner{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:8px}
+  .winter-banner>.winter-badge{position:static;grid-column:1/-1;justify-self:start}
+  .winter-banner-copy{grid-column:1;grid-row:2;min-width:0}
+  .winter-banner-copy small{padding-right:0}
+  .winter-banner-arrow{grid-column:2;grid-row:2;align-self:center}
+}
