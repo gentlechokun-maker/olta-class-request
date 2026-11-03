@@ -8,6 +8,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const params=new URLSearchParams(location.search);
 if(params.get('kind')==='visit'){location.replace(params.get('targetId')?'./?classId='+encodeURIComponent(params.get('targetId'))+'#classes':'./#classes');}
 let kind=params.get('kind')||'seminar',catalog=null;
+const CURRENT_TIMETABLE_END='2026-12-31';
 let receipt=null;try{receipt=JSON.parse(decodeURIComponent(location.hash.slice(1)));if(receipt?.id&&receipt?.token){kind='cancel';const receiptScope=['seminar','visit','absence','consultation'].includes(receipt.kind)?receipt.kind:'seminar';history.replaceState(null,'',location.pathname+'?kind=cancel&bookingKind='+receiptScope);}}catch{}
 if(!['seminar','visit','absence','consultation','cancel'].includes(kind))kind='seminar';
 const requestedScope=kind==='cancel'?(receipt?.kind||params.get('bookingKind')||'seminar'):kind;
@@ -39,7 +40,8 @@ function refresh(){if(!catalog||kind==='cancel')return;
  if(kind==='absence')refreshAbsence();if(kind==='consultation')refreshConsultation();
 }
 async function load(){catalog=null;$('#application').hidden=true;$('#seminar-catalog').hidden=true;$('#cancellation').hidden=true;$('#retry').hidden=true;$('#connection').textContent='일정을 불러오고 있습니다.';try{if(!config.apiUrl){catalog={...demoCatalog(),mode:'demo',bookingEnabled:true,makeupBatchVersion:1,weeks:await(await fetch('./calendar-2026.json')).json(),seminars:[{id:'sample',title:'예시 설명회',date:'2026-11-15',start:'14:00',location:'예시 강의실',enabled:'true',remaining:20}],visits:[],makeupSeats:{},consultationEnabled:true,consultationBusy:[],shinBusy:[]};}else{if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(config.apiUrl))throw Error('운영 서버 주소를 확인해 주세요.');catalog=await readCatalog();if(kind==='absence'&&catalog.makeupBatchVersion!==1)throw Error('여러 날짜 신청 서버를 업데이트 중입니다. 잠시 후 다시 연결해 주세요.');if(!catalog.bookingEnabled)throw Error('예약 기능 서버 업데이트가 필요합니다. 학원에 문의해 주세요.');}
- $('#connection').textContent=catalog.mode==='demo'?'미리보기 · 입력 내용은 저장되지 않습니다.':'예약 서버 연결됨 · 모든 시간은 한국 시간입니다.';
+ if(kind==='absence')catalog.weeks=catalog.weeks.filter(w=>w.date<=CURRENT_TIMETABLE_END);
+ $('#connection').textContent=catalog.mode==='demo'?'미리보기 · 입력 내용은 저장되지 않습니다.':kind==='absence'?'11~12월 시간표 연결됨 · 모든 시간은 한국 시간입니다.':'예약 서버 연결됨 · 모든 시간은 한국 시간입니다.';
  if(kind==='cancel'){$('#cancellation').hidden=false;if(receipt){cf.elements.id.value=receipt.id;cf.elements.token.value=receipt.token;}return;}
  $('#application').hidden=kind==='seminar';$('#seminar-catalog').hidden=kind!=='seminar';$('#change-seminar').hidden=kind!=='seminar';f.elements.kind.value=kind;f.elements.requestId.value=crypto.randomUUID();f.elements.token.value=randomToken();f.elements.privacyVersion.value=BOOKING_VERSION;
  const grades=['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1'];select(f.elements.grade,grades.map(g=>({value:g,text:g})));showField('#seminar-fields',kind==='seminar');showField('#class-fields',['visit','absence'].includes(kind));showField('#visit-fields',kind==='visit');showField('#absence-fields',kind==='absence');showField('#consultation-fields',kind==='consultation');
