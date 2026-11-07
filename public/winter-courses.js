@@ -8,7 +8,6 @@ export function winter2027Course(c){
     'special2027-debate-56':{title:'초5·초6 올치 토론 특강',period:'2027년 1~2월',grades:['초5','초6']},
     'special2027-creative-56':{title:'초5 올치 창의력·경시 특강',period:'2027년 1~2월',grades:['초5']},
     'special2027-navigator-1':{title:'대입 네비게이터 특강 1',period:'2027년 1~2월',grades:['중3','고1','고2']},
-    'special2027-navigator-2':{title:'대입 네비게이터 특강 2',period:'2027년 1~2월',grades:['중3','고1','고2']},
     'special2027-experiment-12':{title:'초1·초2 올치 실험 특강',period:'2027년 1월',grades:['초1','초2']},
     'special2027-experiment-34':{title:'초3·초4 올치 실험 특강',period:'2027년 1월',grades:['초3','초4']},
     'special2027-experiment-56':{title:'초5·초6 올치 실험 특강',period:'2027년 1월',grades:['초5','초6']}
@@ -38,6 +37,7 @@ export function excludedWeekendRoom2027(c){
 export function scheduleKey2027(c){
   const base=[c.id,c.grade,c.title,c.day,c.start,c.end,c.room];
   if(c.bundle)base.push(c.sessions.map(s=>[s.id,s.day,s.start,s.end,s.room]));
+  if(c.theory)base.push(['theory',c.theory.day,c.theory.start,c.theory.end,c.theory.room]);
   if(winter2027Course(c))base.push(winter2027Course(c).period);
   return JSON.stringify(base);
 }
@@ -59,5 +59,5 @@ export function bundleWinter2027(classes){
   return result;
 }
 export function scheduleLabel2027(c){
-  return c.bundle?c.sessions.map(s=>s.day+'요일 '+s.start+'–'+s.end).join(' / ')+' · 주 2회':c.day+'요일 '+c.start+'–'+c.end;
+  return c.bundle?c.sessions.map(s=>s.day+'요일 '+s.start+'–'+s.end).join(' / ')+' · 주 2회':c.theory?c.day+'요일 실험 '+c.start+'–'+c.end+' / 이론 '+c.theory.start+'–'+c.theory.end:c.day+'요일 '+c.start+'–'+c.end;
 }
