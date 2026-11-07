@@ -51,7 +51,7 @@ test('public catalog excludes roster/contacts and fails closed on stale or edite
 test('makeup capacity enforces date-specific six-seat limit and avoids counting blue names twice',()=>{
   const r=runtime();r.admin_=()=>true;r.locked_=f=>f();r.syncTimetable_=()=>true;r.today_=()=> '2026-10-13';r.audit_=()=>{};
   r.Utilities={getUuid:()=>crypto.randomUUID(),formatDate:d=>d.toISOString().slice(0,10)};
-  r.classes_=()=>[{id:'c1',day:'수'}];const tables={'동기화':[{classId:'c1',registered:'4',starting:'1',review:'false'}],'원생':[{classId:'c1',name:'파란원생',status:'makeup'}],'보강':[]};r.read_=name=>tables[name];r.append_=(name,row)=>tables[name].push(row);
+  r.classes_=()=>[{id:'c1',day:'수',title:'아톰 1'}];const tables={'동기화':[{classId:'c1',registered:'4',starting:'1',review:'false'}],'원생':[{classId:'c1',name:'파란원생',status:'makeup'}],'보강':[]};r.read_=name=>tables[name];r.append_=(name,row)=>tables[name].push(row);
   r.addMakeup('c1','파란원생','2026-10-14');assert.equal(tables['보강'].length,1);
   assert.throws(()=>r.addMakeup('c1','다른원생','2026-10-14'),/6명/);
   r.addMakeup('c1','다른원생','2026-10-21');assert.equal(tables['보강'].length,2);

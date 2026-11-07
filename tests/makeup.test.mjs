@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {makeupWindow,validateMakeup} from '../public/domain.js';
-const cls={id:'c1',grade:'초6',day:'목',start:'19:00',end:'21:00',remaining:0,review:false,teacher:'홍T',room:'2교실'};
+const cls={id:'c1',grade:'초6',title:'퀀텀 2',day:'목',start:'19:00',end:'21:00',remaining:0,review:false,teacher:'홍T',room:'2교실'};
 const input={kind:'makeup',targetId:'c1',student:'예시학생',grade:'초6',phone:'01012345678',consent:'yes',privacyVersion:'2026-10-13',requestId:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',date:'2099-10-15',absenceDate:'2026-10-08',missedTopic:'전기 회로 실험',makeupType:'theory',position:'after'};
 const catalog={classes:[cls],slots:[]};
 test('makeup duration and adjacent windows; 22:00 is allowed, 22:01 is forbidden',()=>{
@@ -30,7 +30,7 @@ test('makeup submit stores derived time, idempotent retry, separate dates and no
   r.submitMakeup_({...input,date:'2099-10-22',requestId:'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'});assert.equal(rows.length,2);
   assert.equal(cls.remaining,0);
 });
-test('makeup approval requires identity confirmation, registered roster, no conflicts and linked grade-six theory capacity <=6',()=>{
+test('makeup approval requires identity confirmation, registered roster, no conflicts and theory capacity <=12',()=>{
   const r=runtime();let rows=[{...input,id:input.requestId,consentVersion:'2026-10-13',start:'21:00',end:'22:00',status:'접수'}];r.makeupRequests_=()=>rows;
   r.read_=()=>[{classId:'c1',name:input.student,status:'registered'}];r.write_=(n,v)=>{rows=v;};
   assert.throws(()=>r.reviewMakeupRequest(input.requestId,'확정','홍T','2교실',false),/확인/);
@@ -38,8 +38,8 @@ test('makeup approval requires identity confirmation, registered roster, no conf
   r.classes_=()=>[cls,{day:'목',start:'21:00',end:'22:00',teacher:'홍T',room:'3교실'}];
   assert.throws(()=>r.reviewMakeupRequest(input.requestId,'확정','홍T','2교실',true),/겹칩니다/);
   r.classes_=()=>[cls];
-  for(let i=0;i<6;i++)rows.push({...rows[0],id:'other'+i,student:'다른원생'+i,status:'확정',teacher:'홍T',room:'2교실'});
-  assert.throws(()=>r.reviewMakeupRequest(input.requestId,'확정','홍T','2교실',true),/6명/);
+  for(let i=0;i<12;i++)rows.push({...rows[0],id:'other'+i,student:'다른원생'+i,status:'확정',teacher:'홍T',room:'2교실'});
+  assert.throws(()=>r.reviewMakeupRequest(input.requestId,'확정','홍T','2교실',true),/12명/);
   rows.pop();r.reviewMakeupRequest(input.requestId,'확정','홍T','2교실',true);assert.equal(rows[0].status,'확정');
 });
 test('makeup admin endpoints reject unauthenticated visitors',()=>{

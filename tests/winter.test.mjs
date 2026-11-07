@@ -15,6 +15,14 @@ test('winter eligibility uses explicit year and rejects unrelated grades',()=>{
  assert.equal(winter2027Course({...mid,title:'퀀텀 2'}),null);
  assert.equal(winter2027Grade({...mid,id:'regular'},'초6').grade,'초6');
 });
+test('general elective physics and chemistry accept both high-school grades',()=>{
+ for(const title of ['일반 선택 고등 물리','일반 선택 고등 화학']){
+  const c={id:'regular',grade:'고2',title};
+  assert.equal(winter2027Grade(c,'고1')?.grade,'고1');
+  assert.equal(winter2027Grade(c,'고2')?.grade,'고2');
+  assert.equal(winter2027Grade(c,'중3'),null);
+ }
+});
 const midWed={...mid,id:'y2027-U5',day:'수'},highThu={...high,id:'y2027-F51',day:'목'};
 const sessions=[mid,midWed,high,highThu];
 const bundles=bundleWinter2027(sessions);
