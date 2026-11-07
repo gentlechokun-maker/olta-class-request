@@ -1,5 +1,5 @@
 import {YEAR2027_GRADES,yearGradeLabel,enrollmentRoute,enrollmentPath,mobileWeekdays} from './enrollment-links.js?v=20261028-menus';
-const opening={ 'y2027-C21':'초5', 'y2027-C33':'초1', 'y2027-J21':'초2', 'y2027-C83':'초4' };
+const opening={ 'y2027-C21':'초5', 'y2027-C33':'초2', 'y2027-J21':'초2', 'y2027-C83':'초4' };
 import {winter2027Course,winter2027Grade,scheduleKey2027,scheduleLabel2027} from './winter-courses.js?v=20261107-quantum';
 import {readPublicData} from './public-data.js?v=20261020-year2027';
 import {GRADES,COURSE_GRADES,courseGrade,gradeLabel,studentGrades,curriculum,classCapacity,normalizePhone,makeupWindow,validateMakeup} from './domain.js?v=20261107-waitlist';
