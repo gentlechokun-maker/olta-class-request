@@ -31,9 +31,9 @@ test('bracketed names and parenthesized annotations preserve offsets',()=>{
 const catalog={classes:[{id:'c1',grade:'초3',remaining:1,review:false}],slots:[{id:'s1',grades:['초3','초4']}]};
 const input={kind:'existing',targetId:'c1',grade:'초3',student:'예시학생',phone:'010-1234-5678',consent:'yes',privacyVersion:'2026-10-13',requestId:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'};
 test('valid request is normalized without reserving a seat',()=>{assert.equal(validateRequest(input,catalog).phone,'01012345678');assert.equal(catalog.classes[0].remaining,1);});
-test('reject forged grade, full class, unresolved count, missing consent, invalid phone',()=>{
+test('allow a full class to join the waitlist; reject forged grade or unresolved count',()=>{
   assert.throws(()=>validateRequest({...input,grade:'초4'},catalog));
-  assert.throws(()=>validateRequest(input,{...catalog,classes:[{...catalog.classes[0],remaining:0}]}));
+  assert.equal(validateRequest(input,{...catalog,classes:[{...catalog.classes[0],remaining:0}]}).targetId,'c1');
   assert.throws(()=>validateRequest(input,{...catalog,classes:[{...catalog.classes[0],review:true}]}));
   assert.throws(()=>validateRequest({...input,consent:''},catalog));
   assert.throws(()=>validateRequest({...input,phone:'123'},catalog));

@@ -23,10 +23,10 @@ test('unknown resources and closing time fail closed',()=>{
  assert.equal(openingSlotAvailable({...slot,end:'22:30'},[]),false);
  assert.equal(openingSlotAvailable({...slot,start:'21:00',end:'22:00'},[]),true);
 });
-test('existing class enrollment needs no visit date and full classes are rejected',()=>{
+test('existing class enrollment needs no visit date and full classes can be waitlisted',()=>{
  const input={kind:'existing',targetId:'c1',grade:'초3',student:'예시학생',phone:'01012345678',consent:'yes',privacyVersion:'2026-10-13',requestId:'enrollment-test-0001'};
  assert.equal(validateRequest(input,{classes:[{id:'c1',grade:'초3',remaining:1}],slots:[]}).kind,'existing');
- assert.throws(()=>validateRequest(input,{classes:[{id:'c1',grade:'초3',remaining:0}],slots:[]}));
+ assert.equal(validateRequest(input,{classes:[{id:'c1',grade:'초3',remaining:0}],slots:[]}).targetId,'c1');
 });
 
 test('generated slots stay inside supplied windows and do not switch teachers mid-class',()=>{
