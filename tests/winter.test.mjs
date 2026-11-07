@@ -74,7 +74,7 @@ test('public bundled fields contain both schedules and no private resource or ro
  assert.equal(result.classes[0].sessions.length,2);assert.ok(!result.classes.some(c=>c.id==='y2027-F5'));
 });
 
-test('eleven additional courses keep January-only and January–February eligibility separate',()=>{
+test('current special courses keep January-only and January–February eligibility separate',()=>{
  const cases=[
   ['special2027-debate-3','초3 올치 토론 특강','월','14:00','15:30',['초3'],'2027년 1~2월'],
   ['special2027-creative-3','초6 올치 창의력·경시 특강','월','15:30','17:00',['초6'],'2027년 1~2월'],
@@ -83,12 +83,12 @@ test('eleven additional courses keep January-only and January–February eligibi
   ['special2027-debate-56','초5·초6 올치 토론 특강','금','14:00','15:30',['초5','초6'],'2027년 1~2월'],
   ['special2027-creative-56','초5 올치 창의력·경시 특강','금','15:30','17:00',['초5'],'2027년 1~2월'],
   ['special2027-navigator-1','대입 네비게이터 특강 1','금','16:00','19:00',['중3','고1','고2'],'2027년 1~2월'],
-  ['special2027-navigator-2','대입 네비게이터 특강 2','금','19:00','21:00',['중3','고1','고2'],'2027년 1~2월'],
   ['special2027-experiment-12','초1·초2 올치 실험 특강','화','13:00','14:00',['초1','초2'],'2027년 1월'],
   ['special2027-experiment-34','초3·초4 올치 실험 특강','수','13:00','14:00',['초3','초4'],'2027년 1월'],
   ['special2027-experiment-56','초5·초6 올치 실험 특강','목','13:00','14:00',['초5','초6'],'2027년 1월']
  ];
  const r=runtime();
+ assert.equal(winter2027Course({id:'special2027-navigator-2',title:'대입 네비게이터 특강 2'}),null);
  for(const [id,title,day,start,end,grades,period] of cases){
   const c={id,title,grade:grades[0],day,start,end,room:'3교실',capacity:6,remaining:6,review:false};
   const profile=winter2027Course(c);
