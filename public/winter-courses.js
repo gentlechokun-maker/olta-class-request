@@ -27,9 +27,10 @@ export function winter2027Course(c){
 }
 export function winter2027Grade(c,value){
   const special=winter2027Course(c);
-  if(!special)return value===c.grade?{grade:value,label:'2027년 '+value}:null;
+  if(!special)return year2027ClassGrades(c).includes(value)?{grade:value,label:'2027년 '+value}:null;
   return special.options.find(o=>o.value===value)||null;
 }
+export function year2027ClassGrades(c){return /^일반\s*선택\s*고등\s*(?:물리|화학)$/.test(String(c?.title||''))?['고1','고2']:[c.grade];}
 
 export function excludedWeekendRoom2027(c){
   return ['토','일'].includes(c.day)&&/(?:^|[^0-9])2\s*교실(?:$|[^0-9])/.test(String(c.room||''));
