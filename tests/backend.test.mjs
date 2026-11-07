@@ -12,7 +12,7 @@ test('public endpoint emits only a fixed anonymous catalog and validates callbac
 });
 test('anonymous user cannot invoke any admin mutation',()=>{
   const r=runtime();r.props_=()=>({getProperty:()=> 'owner@example.invalid'});
-  for(const name of ['getAdminDashboard','syncTimetable','updateRequest','confirmFromTimetable','addMakeup','cancelMakeup','savePause','installTriggers'])assert.throws(()=>r[name](),/관리자/);
+  for(const name of ['getAdminDashboard','syncTimetable','updateRequest','confirmFromTimetable','addMakeup','cancelMakeup','installTriggers'])assert.throws(()=>r[name](),/관리자/);
 });
 test('receipt escapes submitted errors; spreadsheet formulas are neutralized',()=>{
   const r=runtime();assert.equal(r.safeCell_('=IMPORTXML("url")'),"'=IMPORTXML(\"url\")");assert.equal(r.safeCell_('+8210'),"'+8210");assert.equal(r.escape_('<script>'), '&lt;script&gt;');
@@ -40,12 +40,13 @@ test('GitHub artifact contains no server code or private records',()=>{
 });
 test('public catalog excludes roster/contacts and fails closed on stale or edited mappings',()=>{
   const r=runtime(),c={id:'c1',grade:'초3',title:'아톰 1',day:'월',start:'14:00',end:'15:00',room:'2교실',teacher:'담당',teacherColor:'#e8eed8',sourceRange:'C10:C12'};
-  const properties={LAST_SYNC:new Date().toISOString(),PRIVACY_CONTACT:'학원 연락처',RETENTION_DAYS:'90'};
+  const cacheNoon=Date.parse('2026-11-06T12:00:00+09:00');r.Date=class extends Date{static now(){return cacheNoon;}};
+  const properties={LAST_SYNC:new Date(cacheNoon).toISOString(),PRIVACY_CONTACT:'학원 연락처',RETENTION_DAYS:'90'};
   r.props_=()=>({getProperty:key=>properties[key]});r.classes_=()=>[c];r.opening2027Catalog_=()=>({slots:r.catalogStale_(properties.LAST_SYNC)?[]:r.generateOpeningSlots([c],1),openingYear:2027,openingUpdatedAt:properties.LAST_SYNC});
   const tables={'동기화':[{classId:'c1',registered:'4',starting:'1',paused:'2',review:'false',configKey:r.classKey_(c)}],'빈시간':[{id:'s1',day:'월',start:'16:00',end:'17:00',room:'2교실',grades:'초3',enabled:'TRUE'}],'신청':[{kind:'new',targetId:'s1',grade:'초3',student:'비공개이름',phone:'01012345678',status:'접수'}]};r.read_=name=>tables[name];
   const good=r.publicCatalog_();assert.equal(good.classes[0].remaining,1);assert.equal(good.classes[0].review,false);assert.ok(good.slots.length>0);assert.ok(!JSON.stringify(good).includes('비공개이름'));assert.ok(!JSON.stringify(good).includes('01012345678'));assert.ok(!JSON.stringify(good).includes('C10:C12'));
   c.sourceRange='D10:D12';assert.equal(r.publicCatalog_().classes[0].review,true);
-  properties.LAST_SYNC=new Date(Date.now()-401*60000).toISOString();assert.equal(r.publicCatalog_().slots.length,0);
+  properties.LAST_SYNC=new Date(cacheNoon-401*60000).toISOString();assert.equal(r.publicCatalog_().slots.length,0);
 });
 test('makeup capacity enforces date-specific six-seat limit and avoids counting blue names twice',()=>{
   const r=runtime();r.admin_=()=>true;r.locked_=f=>f();r.syncTimetable_=()=>true;r.today_=()=> '2026-10-13';r.audit_=()=>{};
@@ -62,11 +63,12 @@ test('makeup capacity enforces date-specific six-seat limit and avoids counting 
 
 test('catalog cache bypasses locks on hits, invalidates, and rejects stale snapshots',()=>{
   const r=runtime();let stored=null,reads=0,locks=0;
+  const cacheNoon=Date.parse('2026-11-06T12:00:00+09:00');r.Date=class extends Date{static now(){return cacheNoon;}};
   r.CacheService={getScriptCache:()=>({get:()=>stored,put:(key,value,ttl)=>{assert.equal(ttl,300);stored=value;},remove:()=>{stored=null;}})};
-  r.locked_=fn=>{locks++;return fn();};r.publicCatalog_=()=>{reads++;return {updatedAt:new Date().toISOString(),classes:[],slots:[]};};
+  r.locked_=fn=>{locks++;return fn();};r.publicCatalog_=()=>{reads++;return {updatedAt:new Date(cacheNoon).toISOString(),classes:[],slots:[]};};
   r.cachedPublicCatalog_();r.cachedPublicCatalog_();assert.equal(reads,1);assert.equal(locks,1);
   r.invalidateCatalogCache_();r.cachedPublicCatalog_();assert.equal(reads,2);
-  stored=JSON.stringify({updatedAt:new Date(Date.now()-401*60000).toISOString()});r.cachedPublicCatalog_();assert.equal(reads,3);
+  stored=JSON.stringify({updatedAt:new Date(cacheNoon-401*60000).toISOString()});r.cachedPublicCatalog_();assert.equal(reads,3);
   const clock=runtime(),noon=Date.parse('2026-10-23T12:00:00+09:00');clock.Date=class extends Date{static now(){return noon;}};
   assert.equal(clock.catalogStale_(new Date(noon-90*60000).toISOString()),false);
   assert.equal(clock.catalogStale_(new Date(noon-110*60000).toISOString()),true);

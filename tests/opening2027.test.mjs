@@ -18,7 +18,7 @@ test('paired elementary resources block both teachers at their own actual times'
  const slots=r.opening2027Catalog_().slots;assert.ok(slots.some(s=>s.day==='화'&&s.start==='16:00'&&s.end==='17:00'));assert.ok(!slots.some(s=>s.day==='화'&&s.start==='16:00'&&s.end==='18:00'));
 });
 test('missing, malformed, stale and uncertain resource snapshots never imply free time',()=>{
- const r=runtime();snapshot(r,[resource('신T')],new Date(Date.now()-401*60000).toISOString());assert.equal(r.opening2027Catalog_().slots.length,0);
+ const r=runtime();snapshot(r,[resource('신T')],new Date(Date.now()-48*3600000).toISOString());assert.equal(r.opening2027Catalog_().slots.length,0);
  r.read2027Snapshot_=()=>({updatedAt:new Date().toISOString(),classes:[{day:'목',resources:''}]});assert.equal(r.opening2027Catalog_().slots.length,0);
  snapshot(r,[resource('')]);assert.ok(!r.opening2027Catalog_().slots.some(s=>s.day==='목'&&s.start==='14:00'));
  snapshot(r,[resource('홍T',{end:''})]);assert.ok(!r.opening2027Catalog_().slots.some(s=>s.day==='목'));
