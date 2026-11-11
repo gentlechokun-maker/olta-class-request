@@ -48,7 +48,37 @@ function render(){
   renderMobile();
 }
 function updateEnrollmentUrl(){if(!['existing','year2027','winter'].includes(state.tab))return;const grade=state.tab==='year2027'?state.yearGrade:state.grade;history.replaceState(null,'',location.pathname+enrollmentPath(state.tab,grade));}
-function selectTab(tab){if(!['existing','winter','year2027','makeup'].includes(tab))return;state.tab=tab;updateEnrollmentUrl();renderUpdated();mobileState.page=0;mobileState.day='';renderMobile();for(const t of ['existing','winter','year2027','makeup']){const active=t===tab;$('#tab-'+t).setAttribute('aria-selected',String(active));$('#tab-'+t).tabIndex=active?0:-1;$('#panel-'+t).hidden=!active;}$('#filters').hidden=['year2027','winter'].includes(tab);$('.mobile-controls').hidden=['year2027','winter','makeup'].includes(tab);if(['year2027','winter'].includes(tab))load2027();$('#classes').scrollIntoView({behavior:'smooth',block:'start'});}
+function selectTab(tab, { scroll = true } = {}) {
+  if (!['existing', 'winter', 'year2027', 'makeup'].includes(tab)) return;
+
+  state.tab = tab;
+  updateEnrollmentUrl();
+  renderUpdated();
+  mobileState.page = 0;
+  mobileState.day = '';
+  renderMobile();
+
+  for (const t of ['existing', 'winter', 'year2027', 'makeup']) {
+    const active = t === tab;
+    $('#tab-' + t).setAttribute('aria-selected', String(active));
+    $('#tab-' + t).tabIndex = active ? 0 : -1;
+    $('#panel-' + t).hidden = !active;
+  }
+
+  $('#filters').hidden = ['year2027', 'winter'].includes(tab);
+  $('.mobile-controls').hidden =
+    ['year2027', 'winter', 'makeup'].includes(tab);
+
+  if (['year2027', 'winter'].includes(tab)) load2027();
+
+  // 사용자가 탭을 선택한 경우에만 자동 스크롤합니다.
+  if (scroll) {
+    $('#classes').scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
+}
 function openRequest(kind,id){
   if(!['existing','year2027','makeup'].includes(kind))return;
   if(kind==='makeup'){location.href='./booking.html?kind=absence&targetId='+encodeURIComponent(id);return;}
@@ -152,8 +182,9 @@ document.addEventListener('click',event=>{
 document.addEventListener('click',event=>document.querySelectorAll('.mobile-grade-picker[open]').forEach(p=>{if(!p.contains(event.target))p.removeAttribute('open');}));
 document.addEventListener('keydown',event=>{if(event.key==='Escape')document.querySelectorAll('.mobile-grade-picker[open]').forEach(p=>{p.removeAttribute('open');p.querySelector('summary').focus();});});
 $('#year2027-day').onchange=event=>{state.yearDay=event.target.value;render2027();};
-if(initialRoute.tab==='year2027')selectTab('year2027');
-
+if (initialRoute.tab === 'year2027') {
+  selectTab('year2027', { scroll: false });
+}
 function renderWinter(){
   const status=$('#winter-status'),grid=$('#winter-grid');
   if(upcoming.loading){status.textContent='겨울방학 특강 시간을 확인하고 있습니다.';grid.innerHTML='';return;}
@@ -178,7 +209,11 @@ function renderWinter(){
     return '<article class="winter-card '+level+'"><span class="winter-chip">'+esc(info.period)+'</span><h3>'+esc(info.title)+'</h3><p class="winter-audience">'+(ready?(Number(ready.remaining)===0?'등록 대기 · ':'신청 가능 · '):'신청 대상 · ')+esc(info.audience)+'</p><p>'+esc(tagline)+'</p><div class="winter-times">'+(ready?'<button type="button" data-request="year2027" data-id="'+esc(ready.id)+'"><span><strong>'+esc(scheduleLabel2027(ready))+'</strong></span><b>'+(Number(ready.remaining)===0?'대기 신청':'특강 신청')+' ↗</b></button>':'<p>'+(expected?esc(expected[0]+'요일 '+expected[1]+'–'+expected[2])+' · ':'')+(!correctTime||!sample?'신청 시간표 갱신 중입니다.':'시간표 확인이 필요합니다.')+'</p>')+'</div></article>';
   }).join('');return cards?'<section class="winter-section"><h4>'+group.heading+'</h4><div class="winter-grid">'+cards+'</div></section>':'';}).join('');
 }
-if(initialRoute.tab==='winter')selectTab('winter');
-if(initialRoute.tab==='existing'&&initialRoute.grade)selectTab('existing');
+if (initialRoute.tab === 'winter') {
+  selectTab('winter', { scroll: false });
+}
+if (initialRoute.tab === 'existing' && initialRoute.grade) {
+  selectTab('existing', { scroll: false });
+}
 window.addEventListener('hashchange',()=>{if(!['#classes','#year2027','#winter'].includes(location.hash))return;const route=enrollmentRoute(location.search,location.hash);if(route.tab==='year2027'){state.yearGrade=route.grade;yearMobileState.grade=route.grade||'초1';yearMobileState.day='';yearMobileState.page=0;}else if(route.tab==='existing'){state.grade=route.grade;mobileState.grade=route.grade||'초1';mobileState.day='';}selectTab(route.tab);render();if(upcoming.catalog)render2027();});
 
