@@ -7,9 +7,22 @@
   <meta name="referrer" content="no-referrer">
   <title>올타과학 - 깨달음의 기쁨</title>
   <link rel="icon" href="./olta-symbol.png" type="image/png">
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="./styles.css?v=20261031-type">
+  <link rel="modulepreload" href="./app.js?v=20261118-swr">
+  <link rel="modulepreload" href="./domain.js?v=20261107-waitlist">
+  <link rel="modulepreload" href="./public-data.js?v=20261118-swr">
+  <link rel="modulepreload" href="./catalog-cache.js?v=20261118-swr">
+  <link rel="modulepreload" href="./enrollment-links.js?v=20261028-menus">
+  <link rel="modulepreload" href="./winter-courses.js?v=20261107-quantum">
+  <link rel="modulepreload" href="./submission.js?v=20261020-receipt">
+  <link rel="modulepreload" href="./demo.js">
   <script src="./config.js"></script>
-  <script type="module" src="./app.js?v=20261107-opening-grade"></script>
+  <script>(function(){var u=window.OLTA_CONFIG&&window.OLTA_CONFIG.apiUrl;if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u))return;var o={method:'GET',mode:'cors',credentials:'omit',redirect:'follow',cache:'no-store',referrerPolicy:'no-referrer',headers:{Accept:'application/json'}};var p={};p[u+'?action=catalog']=fetch(u+'?action=catalog',o);if(location.hash==='#year2027'||location.hash==='#winter'||/[?&]tab=(?:year2027|winter)/.test(location.search))p[u+'?action=year2027']=fetch(u+'?action=year2027',o);window.__OLTA_PREFETCH__=p;})();</script>
+  <script type="module" src="./app.js?v=20261118-swr"></script>
 </head>
 <body>
   <header class="site-header"><a href="./" class="brand brand-lockup" aria-label="올타 과학 홈"><img class="brand-logo" src="./olta-symbol.png" alt="" width="291" height="249"><span>올타 과학</span></a><nav aria-label="주 메뉴"><a class="consultation-link" href="./booking.html?kind=consultation">상담 신청</a><a href="#classes">수업 둘러보기</a><a href="#year2027" data-tab="year2027"><span class="year-menu-label">27년 수업 신청</span><small class="year-menu-note">1월부터 전체 1학년씩 올림</small></a><a href="#how">신청 안내</a><a href="./booking.html?kind=seminar">설명회 신청</a></nav></header>
